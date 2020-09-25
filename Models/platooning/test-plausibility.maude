@@ -1,0 +1,628 @@
+*****  bot patroling from side to side (myDir flip)
+load load .
+
+mod TEST-DO-TASK is
+  inc SCENARIO .
+
+op kbaux : -> KB .
+eq kbaux = (clock(9) class(v(1), veh) (lastAct(actSpeed(v(1), 101/4, 30)) @ 8) (atloc(v(0), loc(1175)) @ 7) (atloc(v(1), loc(1126)) @ 8) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (histGap(v(1), (
+    74 @ 8) ; (75 @ 7) ; 75 @ 6) @ 8) (speed(v(0), 25) @ 7) (speed(v(1), 27) @ 8) (gapNext(v(1), 74) @ 8) (idNext(v(1), v(0)) @ 0) (histSpd(v(1), v(0), noVal ; noVal ; noVal) @ 0) maxAcc(v(1), 3) gapGreen(v(1),
+    1, 3) gapSafety(v(1), 2, 4)) .
+
+op msg0 : -> Msg .
+eq msg0 = msg(v(0), v(1), hbl2f(v(0), 25, loc(1000), (atloc(v(1), loc(945)) @ 0) (platoon(v(0), v(1)) @ 0) speed(v(1), 25) @ 1)) .
+
+*** red handleX(v(1),kbaux,msg0 @ 0) .
+
+*** Scenario 1: Within safety and green bounds.
+ops v0 v1 v2 : -> Agent .
+
+ops lkb lkb0 lkb1 lkbv2 lkb2 : -> KB .
+eq lkb0 = getLKB(v0) .
+eq lkb1 = getLKB(v1) .
+eq lkbv2 = getLKB(v2) .
+
+op id : -> Id .
+
+op kbevskb : -> KBEventsKB .
+eq kbevskb = doTask(veh,id,tick,none,none,none,lkb) .
+
+op devsHB : -> DEvent .
+eq devsHB = hbComm(id,lkb) .
+
+eq lkb2 = timeouts(id,lkb) .
+
+op racts : -> RAct .
+eq racts = actSCP(veh,id,lkb2) .
+
+op acts0 : -> Action .
+eq acts0 = myActs(veh,id,lkb2) .
+op racts2 : -> RAct .
+eq racts2 = vals(id,lkb2,acts0) .
+
+ops segSaf segGr segs : -> FSegments .
+eq segSaf = val-safety(id,lkb2,acts0) .
+eq segGr = val-green(id,lkb2,acts0) .
+eq segs = intersect(segSaf,segGr,nil) .
+op racts3 : -> RAct .
+
+eq racts3 = 
+if segs == nil then getMax(id,segSaf,none)
+      else getMax(id,segs,none) fi .
+var f : Rat .
+ops dis vmin vmax vnxt : -> Rat .
+op vD : Rat -> Rat .
+
+eq vD(f) = (dis + vnxt)/(1 + f) .
+
+ops tminSaf tmaxSaf tminGr tmaxGr : -> Nat .
+ops vminSaf vmaxSaf vminGr vmaxGr : -> Rat . 
+
+eq vminSaf = vD(tmaxSaf) .
+eq vmaxSaf = vD(tminSaf) .
+eq vminGr = vD(tmaxGr) .
+eq vmaxGr = vD(tminGr) .
+
+sort Result .
+op [acts:_, vminGr:_, vmaxGr:_, segGr:_, vminSaf:_, vmaxSaf:_, segSaf:_] : Action Rat Rat FSegments Rat Rat FSegments -> Result .
+
+op getResult : -> Result .
+eq getResult = [acts: acts0, vminGr: vminGr, vmaxGr: vmaxGr, segGr: segGr, vminSaf: vminSaf, vmaxSaf: vmaxSaf, segSaf: segSaf] .
+
+
+op ekbST  : -> KB .
+eq ekbST =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(100)) @ 0)
+  (speed(v(0),20) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(45)) @ 0)
+  (speed(v(1),20) @ 0)
+  (accel(v(1),0) @ 0)
+.
+
+op scenario2 : -> Conf .
+eq scenario2 = v0 v1  
+               infra [eId | ekbS1] .
+               
+
+endm
+
+mod TEST-DO-TASK-SAFE-AND-GREEN is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+eq pos0 = 100 .
+eq pos1 = 45 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+
+**** [acts: actSpeed(v(1), 17, 23),vminGr: 75/4,vmaxGr: 75/2,segGr: [75/4,u(1),23,u(1)],vminSaf: 15,vmaxSaf: 25,segSaf: [17,u(1),23,u(1)]]
+
+eq v0 = mkVeh(0,0,pos0,vnxt,leading(v(1)),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vnxt) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vnxt,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf) 
+        ) .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+op ok : -> Bool .
+eq ok = {u(1),actSpeed(v(1), 75/4, 23)} == racts .
+
+endm
+
+
+mod TEST-DO-TASK-NOT-SAFE-AND-GREEN is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+eq pos0 = 100 .
+eq pos1 = 80 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+
+
+eq v0 = mkVeh(0,0,pos0,vnxt,leading(v(1)),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vnxt) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vnxt,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf) 
+        ) .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+--- result Result: [acts: actSpeed(v(1), 17, 23),vminGr: 10,vmaxGr: 20, segGr: [17,u(1) ,20,u(1)],vminSaf: 8,vmaxSaf: 40/3,segSaf: [17,u(1),20,u(0)]]
+
+op ok : -> Bool .
+eq ok = {u(1),actSpeed(v(1), 17, 17)} == racts .
+
+endm
+
+
+mod TEST-DO-TASK-SAFE-AND-NOT-GREEN is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+eq pos0 = 100 .
+eq pos1 = 30 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+
+
+eq v0 = mkVeh(0,0,pos0,vnxt,leading(v(1)),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vnxt) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vnxt,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf) 
+        ) .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+--- result Result: [acts: actSpeed(v(1), 17, 23),vminGr: 45/2,vmaxGr: 45, segGr: [45/2,u(1),23,u(1)],vminSaf: 18,vmaxSaf: 30,segSaf: [18,u(1),23,u(1)]]
+
+op ok : -> Bool .
+eq ok = {u(1),actSpeed(v(1), 45/2, 23)} == racts .
+
+endm
+
+mod TEST-FOLLOWING-EMERGENCY is inc TEST-DO-TASK .
+
+op modoVeh : -> Mode .
+op dis12 : -> Rat .
+ops pos0 pos1 pos2 : -> Rat .
+ops vel0 vel1 vel2 : -> Rat .
+eq pos0 = 1000 .
+eq pos1 = 945 .
+eq pos2 = 920 .
+eq dis = pos0 - pos1 .
+eq dis12 = pos1 - pos2 .
+eq vnxt = 20 .
+eq vel0 = 25 .
+eq vel1 = 20 .
+eq vel2 = 20 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+eq joinThresh = 150 .
+
+eq v0 = mkVeh(0,0,pos0,vel0,leading(none),
+        (platoon(v(0), v(1) ; v(2)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (atloc(v(2),loc(pos2)) @ 0)        
+        (speed(v(1),vel1) @ 0)
+        (speed(v(2),vel2) @ 0)        
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vel1,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        (histGap(v(1),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(1),v(0),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(1),v(2),noVal ; noVal ; noVal) @ 0)
+        (logSpdPlCkFail(v(1),v(0),0) @ 0)         
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf)
+        ) .
+
+ eq v2 = mkVeh(2,0,pos2,vel2,following(v(0)),
+        (gapNext(v(2),dis12) @ 0)
+        (idNext(v(2),v(1)) @ 0)
+        (histGap(v(2),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(2),v(0),noVal ; noVal ; noVal) @ 0)        
+        (histSpd(v(2),v(1),noVal ; noVal ; noVal) @ 0)
+        (logSpdPlCkFail(v(2),v(1),0) @ 0) 
+        gapGreen(v(2),tminGr,tmaxGr) 
+        gapSafety(v(2),tminSaf,tmaxSaf)
+        ) .
+
+ops infra : -> Agent .
+
+***(
+eq infra = 
+  [i(0) : infra | 
+   lkb : (clock(0)
+         (i2vTrigger(i(0),v(0),
+         1100,50,i2vEmergency(v(0))) @ 0)),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+)
+
+eq infra = 
+  [i(0) : infra | 
+   lkb : clock(0),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+
+
+eq id = v(2) .
+eq lkb = lkbv2 .
+
+op ekbS2  : -> KB .
+eq ekbS2 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(pos0)) @ 0)
+  (speed(v(0),vel0) @ 0)
+  (accel(v(0),0) @ 0)
+   class(v(1),veh)
+  (atloc(v(1),loc(pos1)) @ 0)
+  (speed(v(1),vel1) @ 0)
+  (accel(v(1),0) @ 0)
+   class(v(2),veh)
+  (atloc(v(2),loc(pos2)) @ 0)
+  (speed(v(2),vel2) @ 0)
+  (accel(v(2),0) @ 0)   
+.
+
+
+*** v1 maintains distance
+
+op emergency-scenario : -> ASystem .
+eq emergency-scenario = { v0 v1 v2
+               infra [eId | ekbS2] } .
+
+endm
+
+mod TEST-FOLLOWING-DROPPED-EMERGENCY is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+ops vel0 vel1 : -> Rat .
+eq pos0 = 1000 .
+eq pos1 = 945 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+eq vel0 = 25 .
+eq vel1 = 20 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+eq joinThresh = 150 .
+
+eq v0 = mkVeh(0,0,pos0,vel0,leading(none),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vel1) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vel1,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf)
+        (histSpd(v(1),v(0),noVal ; noVal ; noVal) @ 0)
+        (logSpdPlCkFail(v(1),v(0),0) @ 0)    
+        ) .
+
+ops infra2 : -> Agent .
+
+eq infra2 = 
+  [i(0) : infra | 
+   lkb : (clock(0)
+         (i2vTrigger(i(0),v(0),
+         1100,50,i2vEmergency(v(0))) @ 0)),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+op ekbS2  : -> KB .
+eq ekbS2 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(pos0)) @ 0)
+  (speed(v(0),vel0) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(pos1)) @ 0)
+  (speed(v(1),vel1) @ 0)
+  (accel(v(1),0) @ 0)
+.
+
+*** v1 maintains distance
+
+op emergency-scenario : -> ASystem .
+eq emergency-scenario = { v0 v1 
+               infra2 [eId | ekbS2] } .
+
+endm
+
+
+mod TEST-SIMPLE-FOLLOWING is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+ops vel0 vel1 : -> Rat .
+eq pos0 = 470 .
+eq pos1 = 425 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+eq vel0 = 22 .
+eq vel1 = 20 .
+*** saf distance: [2,4]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [1,3]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+eq joinThresh = 150 .
+
+eq v0 = mkVeh(0,0,pos0,vel0,leading(none),
+         (platoon(v(0), v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vel1) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vel1,following(v(0)),
+        (platoon(v(0), v(1)) @ 0)
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        (histGap(v(1),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(1),v(0),noVal ; noVal ; noVal) @ 0)
+        (logSpdPlCkFail(v(1),v(0),0) @ 0)        
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf)
+        ) .
+
+ops infra2 v2 : -> Agent .
+
+eq infra2 = 
+  [i(0) : infra | 
+   lkb : clock(0),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+op ekbS2 : -> KB .
+eq ekbS2 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(pos0)) @ 0)
+  (speed(v(0),vel0) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(pos1)) @ 0)
+  (speed(v(1),vel1) @ 0)
+  (accel(v(1),0) @ 0)
+.
+
+*** v1 maintains distance
+op simple-scenario : -> ASystem .
+eq simple-scenario = { v0 v1 
+               infra2 [eId | ekbS2] } .
+
+endm
+
+mod TEST-SIMPLE-FOLLOWING-SLOW is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+ops vel0 vel1 : -> Rat .
+eq pos0 = 1000 .
+eq pos1 = 945 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+eq vel0 = 20 .
+eq vel1 = 21 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+eq joinThresh = 150 .
+
+eq v0 = mkVeh(0,0,pos0,vel0,leading(none),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vel1) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vel1,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf)
+        (logSpdPlCkFail(v(1),v(0),0) @ 0)
+ ***       (speed(v(0),vel0) @ 0)
+        (platoon(v(0),v(1)) @ 0)
+***        (histSpd(v(0),v(1), noVal ; (20/1 @ 0) ; (20/1 @ 0)) @ 0) 
+***        (histSpd(v(1),v(0),20 ; 20 ; 20) @ 0)        
+        (histSpd(v(1),v(0),noVal ; noVal ; (20 @ 0)) @ 0)
+        ) .
+
+ops infra2 v2 : -> Agent .
+
+eq infra2 = 
+  [i(0) : infra | 
+   lkb : clock(0),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+op ekbS2  : -> KB .
+eq ekbS2 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(pos0)) @ 0)
+  (speed(v(0),vel0) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(pos1)) @ 0)
+  (speed(v(1),vel1) @ 0)
+  (accel(v(1),0) @ 0)
+***  (idNext(v(1),v(0)) @ 0)
+***  (logSpdPlCkFail(v(1),v(0),0) @ 0)
+***  (histSpd(v(0),v(1), (40/1 @ 0) ; (40/1 @ 0)) @ 0)   
+.
+
+*** v1 maintains distance
+
+op simple-scenario : -> ASystem .
+eq simple-scenario = { v0 v1 
+               infra2 [eId | ekbS2] } .
+
+endm
+
+mod TEST-SIMPLE-FOLLOWING-SAFETY is inc TEST-DO-TASK .
+
+ops pos0 pos1 : -> Rat .
+ops vel0 vel1 : -> Rat .
+eq pos0 = 1000 .
+eq pos1 = 945 .
+eq dis = pos0 - pos1 .
+eq vnxt = 20 .
+eq vel0 = 20 .
+eq vel1 = 40 .
+*** saf distance: [40,80]
+eq tminSaf = 2 . 
+eq tmaxSaf = 4 .
+*** gr distance: [20,60]
+eq tminGr = 1 .
+eq tmaxGr = 3 .
+eq joinThresh = 150 .
+
+eq v0 = mkVeh(0,0,pos0,vel0,leading(none),
+         (platoon(v(0), v(1)) @ 0)
+        (atloc(v(1),loc(pos1)) @ 0)
+        (speed(v(1),vel1) @ 0)
+        ) .
+
+eq v1 = mkVeh(1,0,pos1,vel1,following(v(0)),
+        (gapNext(v(1),dis) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        (histGap(v(1),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(1),v(0),noVal ; noVal ; noVal) @ 0)
+        (logSpdPlCkFail(v(1),v(0),0) @ 0)        
+        gapGreen(v(1),tminGr,tmaxGr) 
+        gapSafety(v(1),tminSaf,tmaxSaf)
+        ) .
+
+ops infra2 v2 : -> Agent .
+
+eq infra2 = 
+  [i(0) : infra | 
+   lkb : clock(0),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+eq id = v(1) .
+eq lkb = lkb1 .
+
+op ekbS2 : -> KB .
+eq ekbS2 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(pos0)) @ 0)
+  (speed(v(0),vel0) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(pos1)) @ 0)
+  (speed(v(1),vel1) @ 0)
+  (accel(v(1),0) @ 0)
+.
+
+*** v1 maintains distance
+
+op simple-scenario : -> ASystem .
+eq simple-scenario = { v0 v1 
+               infra2 [eId | ekbS2] } .
+
+
+var asys : ASystem .
+var conf : Conf .
+var env : Env .
+var id0 : Id .
+vars ff ff0 ff1 : Rat .
+vars t0 t1 t2 : Nat .
+vars kb kb0 : KB .
+
+
+ op crash : ASystem -> Bool .
+ op crash$ : Env -> Bool .
+ ceq crash({conf env})
+  = true 
+  if crash$(env) .
+
+  eq crash$([id0 |
+   (atloc(v(1), loc(ff1)) @ t1)
+   (atloc(v(0), loc(ff0)) @ t0) 
+    kb]) = ff1 >= ff0 .
+
+
+*** search [1] in TEST-SIMPLE-FOLLOWING-SAFETY : simple-scenario =>* asys such that crash(asys) = true .
+
+endm
+
+
+
+
+eof
+select TEST-DO-TASK-SAFE-AND-GREEN .
+red ok .
+select TEST-DO-TASK-NOT-SAFE-AND-GREEN .
+red ok .
+select TEST-DO-TASK-NOT-SAFE-AND-GREEN .
+red ok .
+

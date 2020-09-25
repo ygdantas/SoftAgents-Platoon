@@ -1,0 +1,363 @@
+ **** Unit Real Interval -- should be between 0 and 1 inclusive
+ fmod UVAL is
+  pr CONVERSION .
+  inc RVAL .
+  inc RAT .
+
+  vars u0 u1 u2 : UVal .
+  vars f0 f1 f2 : Rat .
+
+  sort UVal .
+  subsort UVal < RVal .
+  op u : Rat -> UVal . 
+  
+  op equivZero : UVal -> Bool .
+  eq equivZero(u(0)) = true .
+  eq equivZero(u1) = false [owise] .
+
+  eq u(f0) < u(f1) = f0 < f1 .
+  eq u(f0) > u(f1) = f0 > f1 .
+
+  eq equivOne(u(1)) = true .
+  eq equivOne(u1) = false [owise] .
+  
+endfm
+
+fmod PLATOON-AUX is 
+  inc RAT .
+  inc UVAL .
+  inc MODEL-KNOWLEDGE .
+  
+  vars ff ff1 ff2 v1 v2 vmin vmax vminD vmaxD : Rat .
+  vars u1 u2 : UVal .
+  vars id id0 id1 : Id .
+  var kb : KB .
+  vars t t0 : Nat .
+  vars idL idL2 : IdList . 
+
+  op getVelNext : Id KB -> Rat .
+  
+  eq getVelNext(id,(platoon(id0,idL ; id1 ; id ; idL2) @ t0)
+   (speed(id1,ff) @ t) kb) = ff .
+
+*** Case with platoon of two
+ eq getVelNext(id,(platoon(id0,id) @ t0)
+   (speed(id0,ff) @ t) kb) = ff .
+
+  eq getVelNext(id,(speed(id,ff) @ t) kb) = ff [owise] .
+***(
+We are approximating functions from possible velocities to closed intervals. Intervals that are ommitted are assumed to have value u(0).
+)
+
+  sorts FSegment FSegments .
+  subsort FSegment < FSegments .
+  op [_,_,_,_]  : Rat UVal
+            Rat UVal -> FSegment [ctor] . 
+  op nil : -> FSegments .
+  op _;_ : FSegments FSegments -> FSegments [ctor assoc  id: nil] .
+
+*** assume v1 <= ff <= v2, if v1 == v2 then ff1 == ff2
+  op eval : Rat FSegment -> UVal .
+  eq eval(ff,[v1,u(ff1),v2,u(ff2)])
+   = if v2 == v1 
+    then u(ff1) *** (better be == ff2)
+    else u(ff1 + (ff2 - ff1) * ((ff - v1) / (v2 - v1)))
+    fi .
+
+****   u(((ff - v1) * (ff2 - ff1)) / (v2 - v1)) .  
+
+
+  op valSpeed : Rat Rat Rat Rat -> FSegment .
+
+  eq valSpeed(vmin,vmax,vminD,vmaxD) = 
+  if vmaxD <= vmin and vminD <= vmin then
+      [vmin,u(1),(vmin + vmax) / 2,u(0)] 
+      else
+      (if vmax <= vminD and vmax <= vmaxD then 
+        [(vmin + vmax) / 2, u(0),vmax,u(1)]
+       else 
+       (if vmin <= vminD and vmax >= vmaxD then
+        [vminD,u(1),vmaxD,u(1)] 
+        else
+        (if vmin >= vminD and vmax >= vmaxD then
+          [vmin,u(1),vmaxD,u(1)]
+         else
+         (if vmin >= vminD and vmax <= vmaxD then 
+           [vmin,u(1),vmax,u(1)]
+           else
+         *** case vmin <= vminD and vmax <= vmaxD 
+          [vminD,u(1),vmax,u(1)]
+        fi) fi)fi)fi)fi . 
+endfm
+
+fmod VAL-GREEN is 
+  inc SOFT-AGENTS .
+  inc UVAL .
+  inc MODEL-ACTIONS .
+  inc PLATOON-AUX .
+  ***(
+  op val-green : Id KB  -> UVal .
+  ceq val-green(id, 
+      (gapNext(id,dis) @ t) 
+      (gapGreen(id,tmin,tmax) @ t1) 
+      (speed(id,vel) @ t2) kb) = 
+      if ff3 > tmax or ff3 < tmin then u(0) 
+      else 
+        (tmax - ff3 
+          / tmax - tmin)
+      fi
+   if ff3 := dis / vel .
+)
+  vars id id2 : Id .
+  vars vmin vminD vmaxD vel vmax vnxt dis : Rat .
+  vars t t1 t2 t3 tmin tmax : Nat .
+  vars kb kb1 : KB .
+
+  op val-green : Id KB Action  -> FSegment .
+  ceq val-green(id,kb,
+      actSpeed(id,vmin,vmax))
+   = valSpeed(vmin,vmax,vminD,vmaxD)
+   if (gapNext(id,dis) @ t) 
+      gapGreen(id,tmin,tmax) 
+      (speed(id,vel) @ t2) 
+      (mode(id,following(id2)) @ t3) kb1 := kb
+   /\ vnxt := getVelNext(id,kb)
+   /\ vminD := (dis + vnxt)/(1 + tmax)
+   /\ vmaxD := (dis + vnxt)/(1 + tmin) .
+
+  eq val-green(id,kb,actSpeed(id,vmin,vmax)) = [vmin,u(1),vmax,u(1)] [owise] .
+
+
+--- op val-green$ : Rat Rat Rat Rat -> FSegments .
+--- eq val-green$(vmin,vmax,vminD,vmaxD) = 
+---   if vmaxD < vmin then
+---       [vmin,u(1),(vmin + vmax) / 2,u(0)] 
+---       else
+---       (if vmax < vminD then
+---         [(vmin + vmax) / 2, u(0),vmax,u(1)]
+---        else 
+---        (if vminD >= vmin and vmaxD >= vmax then 
+---          [vmin,u(0),vmax,u(1)]
+---          else
+---           vminD <= vmin and
+---              vmaxD <= vmax then
+---          [vmin,u(1),vmaxD,u(0)] 
+---           fi)
+---          fi)
+---        fi .
+endfm
+
+fmod VAL-SAFETY is 
+  inc SOFT-AGENTS .
+  inc UVAL .
+  inc MODEL-ACTIONS .
+  inc PLATOON-AUX .
+
+  vars id id2 : Id .
+  vars kb kb1 : KB .
+  vars f c vnxt vmin vmax vminD vmaxD vel dis : Rat .
+  vars t t2 t3 : Nat .
+
+  op caution : Id KB -> Rat .
+  op free : Id KB -> Rat .
+  op val-safety : Id KB Action -> FSegment .
+***(
+in one sec vehnext will be at 
+   lnext + vnext = lego + dis + vnext
+ego will be at lego + spnext
+disnext will be dis + vnext - spnext
+c * spnext < disnext < f * spnext 
+implies dis + vnext/1+f < spnext < dis + vnext/1+c
+)
+  ceq val-safety(id,kb,actSpeed(id,vmin,vmax))
+   = 
+    valSpeed(vmin,vmax,vminD,vmaxD)
+   if (gapNext(id,dis) @ t)
+      gapSafety(id,c,f) 
+      (speed(id,vel) @ t2) 
+      (mode(id,following(id2)) @ t3) kb1 := kb
+   /\ vnxt := getVelNext(id,kb)
+   /\ vminD := (dis + vnxt)/(1 + f)
+   /\ vmaxD := (dis + vnxt)/(1 + c) .
+
+  eq val-safety(id,kb,actSpeed(id,vmin,vmax)) = [vmin,u(1),vmax,u(1)] [owise] .
+
+endfm
+
+fmod VAL-JOIN is 
+  inc SOFT-AGENTS .
+  inc UVAL .
+  inc MODEL-ACTIONS .
+  inc PLATOON-AUX .
+
+  vars id id2 : Id .
+  vars kb kb1 : KB .
+  vars f c vnxt vmin vmax vminD vmaxD vel dis locV : Rat .
+  vars t t2 t3 t4 : Nat .
+  vars l1 l2 : Loc .
+
+  op val-join : Id Rat Loc KB Action -> FSegment .
+***(
+in one sec vehnext will be at 
+   lnext + vnext = lego + dis + vnext
+ego will be at lego + spnext
+disnext will be dis + vnext - spnext
+c * spnext < disnext < f * spnext 
+implies dis + vnext/1+f < spnext < dis + vnext/1+c
+)
+  ceq val-join(id,vnxt,l1,kb,actSpeed(id,vmin,vmax))
+   = 
+    valSpeed(vmin,vmax,vminD,vmaxD)
+   if  gapSafety(id,c,f) 
+       (speed(id,vel) @ t2)
+       (atloc(id, l2) @ t4) kb1 := kb
+   /\ dis := ldist(l1,l2) 
+   /\ vminD := (dis + vnxt)/(1 + f)
+   /\ vmaxD := (dis + vnxt)/(1 + c) .
+   
+   eq val-join(id,vnxt, l1, kb,actSpeed(id,vmin,vmax)) = [vmin,u(1),vmax,u(1)] [owise] .
+
+
+endfm
+
+
+fmod VAL-SAFETY-GREEN is
+  inc VAL-SAFETY .
+  inc VAL-GREEN .
+  inc VAL-JOIN .
+  
+  vars id id1 : Id .
+  var racts : RActSet .
+  vars v1 v2 v3 v4 mx mn 
+       ff1 ff2 ff3 ff4 : Rat .
+  var act : Action .
+  vars vmin vmax : Rat .
+  vars kb kb1 : KB .
+  var newSeg : FSegment .
+  vars segSaf segGr segs segs1 segs2 segsAcc segJoin : FSegments .
+  vars u u1 u2 u3 u4 umn umx : UVal .
+  vars t0 t : Nat .
+  var ids : IdSet .
+
+  op vals : Id KB Action -> RActSet .
+
+  *** Leader just uses the current actions.
+  *** VN: There should be a difference when waiting for a follower or not.
+  ceq vals(id,kb,act) 
+   = {u(1),act}
+   if (mode(id,leading(ids)) @
+    t0) kb1 := kb .
+
+  **** The use of val-safety and val-green only make sense when in following mode.
+  ceq vals(id,kb,act) 
+   = racts
+   if (mode(id,following(id1)) @
+    t0) kb1 := kb
+   /\ segSaf := val-safety(id,kb,act)
+   /\ segGr := val-green(id,kb,act) 
+   /\ segs := intersect(segSaf,segGr,nil)
+   /\ racts := if segs == nil then getMax(id,segSaf,none)
+      else getMax(id,segs,none) fi .
+
+*** When in emergency mode, then 
+*** reduce to the min velocity  
+ ceq vals(id,kb,actSpeed(id,vmin,vmax)) 
+   = {u(1),actSpeed(id,vmin,vmin)}
+   if (mode(id,emergency) @
+    t0) kb1 := kb .
+
+  vars spd l : Rat .
+  var loc : Loc .
+  var idL : Id . 
+
+
+  ceq vals(id,kb,act) 
+   = racts
+   if (mode(id,fuseRear(idL, id1, spd, loc)) @
+    t0) kb1 := kb
+   /\ segJoin := val-join(id,spd,loc,kb,act)
+   /\ racts :=  getMax(id,segJoin,none) .
+
+*** val-join(id,vnxt,l1,kb,actSpeed(id,vmin,vmax))
+
+*** If no cases applies, keep the same speed.
+ eq vals(id,kb (speed(id,ff1) @ t0),actSpeed(id,vmin,vmax)) 
+  = {u(1),actSpeed(id,ff1,ff1)} [owise] . 
+
+  op getMax : Id FSegments RActSet -> RActSet .
+  eq getMax(id,nil,racts) = racts .
+*** VN: I would have expected:
+*** getMax(id,[v1,u1,v2,u2] ; segs,racts0) = getMax(id,segs,racts racts0)
+ceq getMax(id,[v1,u1,v2,u2] ; segs,none)
+=  getMax(id,segs,racts)
+if racts := 
+  (if u1 > u2 then {u1,actSpeed(id,v1,v1)}
+   else (if u2 > u1 then {u2,actSpeed(id,v2,v2)}
+   else {u1,actSpeed(id,v1,v2)}  fi) fi) .
+   
+  eq getMax(id,[v1,u1,v2,u2] ; segs,{u,act} racts)
+  = (if u1 > u or u2 > u then
+      (if u1 > u2 then 
+         getMax(id,segs,{u1,actSpeed(id,v1,v1)})
+         else 
+         (if u1 < u2 then
+              getMax(id,segs,{u2,actSpeed(id,v2,v2)})
+            else 
+            getMax(id,segs,{u1,actSpeed(id,v1,v2)}) 
+          fi) fi) 
+     else 
+     (if u1 == u and u2 == u then 
+        getMax(id,segs,{u,actSpeed(id,v1,v2)}
+                    {u,act} racts) 
+      else 
+      (if u1 == u then
+         getMax(id,segs,{u1,actSpeed(id,v1,v1)}
+                    {u,act} racts) 
+        else 
+          (if u2 == u then 
+            getMax(id,segs,{u2,actSpeed(id,v2,v2)}
+                    {u,act} racts) 
+           else 
+           getMax(id,segs,{u,act} racts) 
+           fi) fi)
+      fi)
+     fi) .
+     
+
+  op intersect : FSegments FSegments FSegments -> FSegments .
+  eq intersect(nil,segs,segsAcc) = segsAcc .
+  eq intersect(segs,nil,segsAcc) = segsAcc .
+  *** prefer the bigger speed?
+  eq intersect([v1,u1,v2,u2] ; segs,[v3,u3,v4,u4] ; segs1,segsAcc) 
+   = if v4 < v1 then 
+   intersect([v1,u1,v2,u2] ; segs,segs1,segsAcc)
+   else
+   (if v2 < v3 then 
+    intersect(segs,[v3,u3,v4,u4] ; segs1,segsAcc)
+   else
+  intersect(segs,segs1,
+  segsAcc ; newSeg([v1,u1,v2,u2],[v3,u3,v4,u4]))
+         fi ) fi .
+
+  op newSeg : FSegment FSegment -> FSegment .
+  ceq newSeg([v1,u1,v2,u2],[v3,u3,v4,u4]) 
+   = [mn,umn,mx,umx]
+   if mn := max(v1,v3)
+   /\ mx := min(v2,v4)
+   /\ u(ff1) := eval(mn,[v1,u1,v2,u2])
+   /\ u(ff2) := eval(mn,[v3,u3,v4,u4])
+   /\ umn := u(ff1 * ff2)
+   /\ u(ff3) := eval(mx,[v1,u1,v2,u2])
+   /\ u(ff4) := eval(mx,[v3,u3,v4,u4]) 
+   /\ umx := u(ff3 * ff4) .
+
+endfm
+***(
+ 24 v0 1480 v1 1417 v2 700   717
+ 64 v0 2280 v1 2197 v2 1700  497
+104 v0 3080 v1 3017 v2 2700  317
+v(2) joins the platoon at 161
+172 v0 4440 v1 8709/2  v2 4400
+               4354.5
+               
+)

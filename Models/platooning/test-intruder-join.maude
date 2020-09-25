@@ -1,0 +1,326 @@
+load test-following .
+***load intruder .
+
+mod TEST-INTRUDER-JOIN is
+***  inc TEST-FOLLOWING-JOIN-2 .
+  inc TEST-FOLLOWING-JOIN .
+  inc INTRUDER-MODEL-SET .
+
+ vars n clck cnt : Nat .
+ var msgs : Msgs .
+ var intr : Intruder .
+ var conf : Conf .
+ var attrs : AttributeSet .
+ vars kb kb0 kb1 : KB .
+ vars t0 t1 t2 t3 : Nat .
+ vars ff ff0 ff1 ff2 ffL ffH spdv0 spdv1 spdv2 : Rat .
+ var int : Intruder .
+ var asys scario : ASystem .
+ var iasys : ASystemIntruder .
+ var agent agent1 agent2 agent3 : Agent .
+ var cl : Class .
+ var id0 : Id .
+ var env : Env .
+ var b : Bool .
+ var v : IdSet .
+ var cls : Class .
+ var evs : EventSet .
+
+ op imsgs : -> Msgs .
+
+
+ op genMsgs : Rat Nat Msgs -> Msgs .
+ eq genMsgs(ff,s n,msgs) 
+  = genMsgs(ff,n, msg(v(0), v(2), hbl2j(v(0),v(1),ff,loc(1000 + ff * (s n))) ) msgs) .
+ eq genMsgs(ff,0,msgs) = msgs .
+
+***  = genMsgs(ff,n, msg(v(0), v(1), hbl2j(v(0),v(0),ff,loc(1000 + ff * (s n))) ) msgs) .
+***   = genMsgs(ff,n, msg(v(0), v(2), hbl2j(v(0),v(1),ff,loc(1000 + ff * (s n))) ) msgs) .
+*** = genMsgs(ff,n, msg(v(0), v(2), hbl2j(v(0),v(1),ff,loc(1000 + ff * (s n))) ) msgs) .
+
+
+
+
+*** genMsgs(ff,n,msg(v(0), v(1), "fuse", OK(v(0), ff, loc(1000 + ff * (s n)))) msg(v(0), v(1), hbl2j(v(0),v(0),ff,loc(1000 + ff * (s n))) ) msgs) .
+
+*** msg(v(0),v(1), hbl2f(v(0),ff,loc(1000 + ff * (s n)),none))
+*** add hbl2j
+***msg(v(0),v(1), hbl2f(v(0),ff,loc(1000 + ff * (s n)),none))
+
+ op iid : -> Id .
+ op intruder : Rat Nat -> Intruder .
+ eq intruder(ff,n) =
+   [iid : intruder |
+      (v2vMsgs : genMsgs(ff,n,none))
+      (blockActSndSet : { v(0) ; false ; 0} )
+      ] .
+
+ op asysint : Rat Nat -> ASystemIntruder .
+ eq asysint(ff,n) =
+  {scenario ; intruder(ff,n)} .
+
+ op asys2 : -> ASystemIntruder .
+
+ op crash : ASystemIntruder -> Bool .
+ op crash$ : Env -> Bool .
+ ceq crash({ {conf env} ; int})
+  = true 
+  if crash$(env) .
+
+  eq crash$([id0 |
+   (atloc(v(2), loc(ff1)) @ t1)
+   (atloc(v(1), loc(ff0)) @ t2) 
+    kb]) = ff1 >= ff0 .
+
+
+ op crash2 : ASystemIntruder -> Bool .
+ op crash2$ : Env -> Bool .
+ ceq crash2({ {conf env} ; int})
+  = true 
+  if crash2$(env) .
+
+  eq crash2$([id0 |
+   (atloc(v(2), loc(ff2)) @ t1)
+   (atloc(v(1), loc(ff1)) @ t2) 
+    kb]) = ff2 >= ff1 .
+
+
+op getAgtFromConf : ASystemIntruder -> Agent .
+eq getAgtFromConf({ { agent1 agent2 conf env } ; int }) = agent1 .
+eq getAgtFromConf({ { agent1 agent2 agent3 conf env }  ; int }) = agent1 .        
+
+op crash3 : ASystemIntruder -> Bool .
+op crash3$ : Agent -> Bool .
+ 
+ceq crash3({ scario ; int})
+ = true 
+ if crash3$(getAgtFromConf({ scario ; int})) .
+
+*** eq crash2({ scario ; int}) = false [owise] .
+ceq crash3$( [v(0) : cl | 
+            lkb : kb0,
+            ckb : none,
+            sensors : (locS speedS gapS), 
+            evs : evs ] 
+             )
+=  if (t0 > 0) then
+     true
+  else
+     false
+  fi      
+ if (platoon(v(0), v(1) ; v(2)) @ t0) kb := kb0 .
+
+eq crash3$(agent1) = false [owise] .
+
+op noLogs : ASystemIntruder -> Bool .
+op noLogs$ : Agent -> Bool .
+ 
+ceq noLogs({ scario ; int})
+ = true 
+ if noLogs$(getAgtFromConf({ scario ; int})) .
+
+*** eq crash2({ scario ; int}) = false [owise] .
+ceq noLogs$( [v(1) : cl | 
+            lkb : kb0,
+            ckb : none,
+            sensors : (locS speedS gapS), 
+            evs : evs ] 
+             )
+= if ( (cnt == 0) )  then
+    true
+  else
+    false
+  fi 
+if (logSpdPlCkFail(v(1), v(0), cnt) @ t1) kb := kb0 .
+
+endm
+
+eof
+
+*** new load; injection + blocking; countermeasure disabled ***
+search [1] in TEST-INTRUDER-JOIN : asysint(70, 1) =>* iasys such that crash(iasys) = true .
+
+Solution 1 (state 9407)
+states: 9408  rewrites: 1255896 in 1620ms cpu (1420ms real) (884433 rewrites/second)
+iasys --> {{
+[eId |
+  clock(16) class(v(0), veh) class(v(1), veh) class(v(2), veh) class(i(0), infra) (atloc(v(0), loc(860)) @ 16) (atloc(v(1), loc(810)) @ 16) (atloc(v(2), loc(812)) @ 16) (speed(v(0), 20) @ 16) (speed(v(
+    1), 20) @ 16) (speed(v(2), 38) @ 16) (accel(v(0), 0) @ 16) (accel(v(1), 0) @ 16) accel(v(2), 0) @ 16] 
+[v(0) : veh |
+  lkb : (clock(16) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 15) (atloc(v(0), loc(840)) @ 15) (atloc(v(1), loc(770)) @ 14) (atloc(v(2), loc(610)) @ 8) (mode(v(0), leading(none)) @ 9) (platoon(
+    v(0), v(1) ; v(2)) @ 9) (speed(v(0), 20) @ 15) (speed(v(1), 20) @ 14) (speed(v(2), 20) @ 8) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) (v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 20, loc(790))) @ 15) @ 0) v2v(v(0), msg(v(2), v(0), hbj2l(v(2), v(1), 35, loc(777))) @ 15) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(16) class(v(1), veh) (lastAct(actSpeed(v(1), 35/2, 23)) @ 15) (atloc(v(0), loc(700)) @ 8) (atloc(v(1), loc(790)) @ 15) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (histGap(
+    v(1), (50 @ 15) ; (50 @ 14) ; 50 @ 13) @ 15) (speed(v(0), 20) @ 8) (speed(v(1), 20) @ 15) (gapNext(v(1), 50) @ 15) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (
+    20 @ 8) ; (20 @ 7) ; 20 @ 6) @ 8) (histSpd(v(1), v(2), noVal ; noVal ; noVal) @ 0) maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[v(2) : veh |
+  lkb : (clock(16) class(v(2), veh) (lastAct(actSpeed(v(2), 38, 38)) @ 15) (atloc(v(2), loc(777)) @ 15) (mode(v(2), fuseRear(v(0), v(1), 70, loc(1070))) @ 9) (speed(v(2), 35) @ 15) (gapNext(v(2), 13) @
+    15) maxAcc(v(2), 3) gapGreen(v(2), 1, 3) gapSafety(v(2), 2, 4)),
+  ckb : (leader(v(2)) @ 2),
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(16) (atloc(v(0), loc(840)) @ 15) (atloc(v(1), loc(790)) @ 15) (atloc(v(2), loc(777)) @ 15) (i2vTrigger(i(0), v(2), 500, 50, nuPlatoon) @ 0) i2vTrigger(i(0), v(2), 550, 50, join(v(0))) @
+    0),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgs : none
+  blockActSndSet : {v(0) ; true ; 0}]}
+
+
+*** new load; injection + blocking; countermeasure enabled ***
+search [1] in TEST-INTRUDER-JOIN : asysint(70, 1) =>* iasys such that crash(iasys) = true .
+
+Solution 1 (state 9407)
+states: 9408  rewrites: 1290578 in 1412ms cpu (1411ms real) (914007 rewrites/second)
+iasys --> {{
+[eId |
+  clock(16) class(v(0), veh) class(v(1), veh) class(v(2), veh) class(i(0), infra) (atloc(v(0), loc(860)) @ 16) (atloc(v(1), loc(810)) @ 16) (atloc(v(2), loc(812)) @ 16) (speed(v(0), 20) @ 16) (speed(v(
+    1), 20) @ 16) (speed(v(2), 38) @ 16) (accel(v(0), 0) @ 16) (accel(v(1), 0) @ 16) accel(v(2), 0) @ 16] 
+[v(0) : veh |
+  lkb : (clock(16) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 15) (atloc(v(0), loc(840)) @ 15) (atloc(v(1), loc(770)) @ 14) (atloc(v(2), loc(610)) @ 8) (mode(v(0), leading(none)) @ 9) (platoon(
+    v(0), v(1) ; v(2)) @ 9) (speed(v(0), 20) @ 15) (speed(v(1), 20) @ 14) (speed(v(2), 20) @ 8) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) (v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 20, loc(790))) @ 15) @ 0) v2v(v(0), msg(v(2), v(0), hbj2l(v(2), v(1), 35, loc(777))) @ 15) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(16) class(v(1), veh) (lastAct(actSpeed(v(1), 35/2, 23)) @ 15) (atloc(v(0), loc(700)) @ 8) (atloc(v(1), loc(790)) @ 15) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (histGap(
+    v(1), (50 @ 15) ; (50 @ 14) ; 50 @ 13) @ 15) (speed(v(0), 20) @ 8) (speed(v(1), 20) @ 15) (gapNext(v(1), 50) @ 15) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (
+    20 @ 8) ; (20 @ 7) ; 20 @ 6) @ 8) (histSpd(v(1), v(2), noVal ; noVal ; noVal) @ 0) maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[v(2) : veh |
+  lkb : (clock(16) class(v(2), veh) (lastAct(actSpeed(v(2), 38, 38)) @ 15) (atloc(v(2), loc(777)) @ 15) (mode(v(2), fuseRear(v(0), v(1), 70, loc(1070))) @ 9) (speed(v(2), 35) @ 15) (gapNext(v(2), 13) @
+    15) maxAcc(v(2), 3) gapGreen(v(2), 1, 3) gapSafety(v(2), 2, 4)),
+  ckb : (leader(v(2)) @ 2),
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(16) (atloc(v(0), loc(840)) @ 15) (atloc(v(1), loc(790)) @ 15) (atloc(v(2), loc(777)) @ 15) (i2vTrigger(i(0), v(2), 500, 50, nuPlatoon) @ 0) i2vTrigger(i(0), v(2), 550, 50, join(v(0))) @
+    0),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgs : none
+  blockActSndSet : {v(0) ; true ; 0}]}
+
+
+search [1] in TEST-INTRUDER-JOIN :  asysint(70, 9) =>* iasys such that crash(iasys) .
+
+
+
+*** with # blocked messaged enabled ***
+search [1] in TEST-INTRUDER-JOIN : asysint(70, 1) =>* iasys such that crash(iasys) = true .
+
+Solution 1 (state 229292)
+states: 229293  rewrites: 171588581 in 252828ms cpu (252879ms real) (678677 rewrites/second)
+iasys --> {{
+[eId |
+  clock(19) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(870)) @ 19) (atloc(v(1), loc(871)) @ 19) (speed(v(0), 20) @ 19) (speed(v(1), 19) @ 19) (accel(v(0), 0) @ 19) accel(v(1),
+    0) @ 19] 
+[v(0) : veh |
+  lkb : (clock(19) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 18) (atloc(v(0), loc(850)) @ 18) (atloc(v(1), loc(826)) @ 17) (mode(v(0), leading(none)) @ 8) (platoon(v(0), v(1)) @ 8) (speed(v(0),
+    20) @ 18) (speed(v(1), 23) @ 17) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 22, loc(849))) @ 18) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(19) class(v(1), veh) (lastAct(actSpeed(v(1), 19, 19)) @ 18) (atloc(v(0), loc(830)) @ 17) (atloc(v(1), loc(849)) @ 18) (mode(v(1), following(v(0))) @ 9) (platoon(v(0), v(1)) @ 8) (histGap(
+    v(1), (1 @ 18) ; (4 @ 17) ; 8 @ 16) @ 18) (speed(v(0), 20) @ 17) (speed(v(1), 22) @ 18) (gapNext(v(1), 1) @ 18) (idNext(v(1), v(0)) @ 9) (histSpd(v(1), v(0), (20 @ 17) ; (70 @ 10) ; 20 @ 9) @ 17)
+    maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : (leader(v(1)) @ 1),
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(1), msg(v(0), v(1), hbl2f(v(0), 20, loc(850), (atloc(v(1), loc(826)) @ 17) (platoon(v(0), v(1)) @ 8) speed(v(1), 23) @ 17)) @ 18) @ 0)] 
+[i(0) : infra |
+  lkb : (clock(19) (atloc(v(0), loc(850)) @ 18) (atloc(v(1), loc(849)) @ 18) (i2vTrigger(i(0), v(1), 500, 50, nuPlatoon) @ 0) i2vTrigger(i(0), v(1), 550, 50, join(v(0))) @ 0),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgs : none
+  blockActSndSet : {v(0) ; true ; 7}]}
+
+
+search [1] in TEST-INTRUDER-JOIN : asysint(70, 1) =>* iasys such that crash(iasys) = true .
+
+Solution 1 (state 125902)
+states: 125903  rewrites: 105476081 in 143000ms cpu (143005ms real) (737594 rewrites/second)
+iasys --> {{
+[eId |
+  clock(19) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(870)) @ 19) (atloc(v(1), loc(871)) @ 19) (speed(v(0), 20) @ 19) (speed(v(1), 19) @ 19) (accel(v(0), 0) @ 19) accel(v(1),
+    0) @ 19] 
+[v(0) : veh |
+  lkb : (clock(19) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 18) (atloc(v(0), loc(850)) @ 18) (atloc(v(1), loc(826)) @ 17) (mode(v(0), leading(none)) @ 8) (platoon(v(0), v(1)) @ 8) (speed(v(0),
+    20) @ 18) (speed(v(1), 23) @ 17) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 22, loc(849))) @ 18) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(19) class(v(1), veh) (lastAct(actSpeed(v(1), 19, 19)) @ 18) (atloc(v(0), loc(830)) @ 17) (atloc(v(1), loc(849)) @ 18) (mode(v(1), following(v(0))) @ 9) (platoon(v(0), v(1)) @ 8) (histGap(
+    v(1), (1 @ 18) ; (4 @ 17) ; 8 @ 16) @ 18) (speed(v(0), 20) @ 17) (speed(v(1), 22) @ 18) (gapNext(v(1), 1) @ 18) (idNext(v(1), v(0)) @ 9) (histSpd(v(1), v(0), (20 @ 17) ; (70 @ 10) ; 20 @ 9) @ 17)
+    maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : (leader(v(1)) @ 1),
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(1), msg(v(0), v(1), hbl2f(v(0), 20, loc(850), (atloc(v(1), loc(826)) @ 17) (platoon(v(0), v(1)) @ 8) speed(v(1), 23) @ 17)) @ 18) @ 0)] 
+[i(0) : infra |
+  lkb : (clock(19) (atloc(v(0), loc(850)) @ 18) (atloc(v(1), loc(849)) @ 18) (i2vTrigger(i(0), v(1), 500, 50, nuPlatoon) @ 0) i2vTrigger(i(0), v(1), 550, 50, join(v(0))) @ 0),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgs : none
+  blockActSndSet : {v(0) ; true}]}
+
+search [1] in TEST-INTRUDER-JOIN : asysint(70, 1) =>* iasys such that crash2(iasys) = true .
+
+
+search [1] in TEST-INTRUDER-JOIN : asysint(70, 1) =>* iasys such that crash2(iasys) and crash3(iasys) .
+
+
+
+
+
+
+
+
+
+
+
+
+
+***(
+op getAgtFromConf : ASystemIntruder -> Agent .
+eq getAgtFromConf({ { agent1 agent2 conf env } ; int }) = agent1 .
+eq getAgtFromConf({ { agent1 agent2 agent3 conf env }  ; int }) = agent1 .        
+
+op crash2 : ASystemIntruder -> Bool .
+op crash2$ : Agent -> Bool .
+ 
+ceq crash2({ scario ; int})
+ = true 
+ if crash2$(getAgtFromConf({ scario ; int})) .
+
+*** eq crash2({ scario ; int}) = false [owise] .
+ceq crash2$( [v(0) : cl | 
+            lkb : kb0,
+            ckb : none,
+            sensors : (locS speedS gapS), 
+            evs : evs ] 
+             )
+= if (ff2 >= ff1) then
+    true
+  else
+    false
+  fi 
+if (platoon(v(0), v(1) ; v(2)) @ t0) (atloc(v(1), loc(ff1)) @ t2) (atloc(v(2), loc(ff2)) @ t3) kb := kb0 .
+)

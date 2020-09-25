@@ -1,0 +1,165 @@
+I made a default for getVelNext
+  eq getVelNext(id,(speed(id,ff) @ t) kb) = ff [owise] .
+there is now info for getVelNext
+
+vminD, vmaxD m/s   desired speed range  ??
+
+***(
+Numbers
+
+1m/s = 2.2 mph  --- meters/sec v miles/hr
+sp(sp0,acc,dt) =  sp0 + (acc * dt)
+1m/s/s for 30s -> increase speed by 30m/s
+
+From DOT doc 
+acceleration/deceleration 2.5-3.5 m/s/s
+maintaining  means +/- 6m/s
+
+130k/h ~ 36m/s
+)
+
+********************************************************
+documenting msg handling and mode setting
+********************************************************
+handleX tmsg >> mmsg,snds
+
+-------------- fuse protocol
+-------------  leader role
+ msg(idJ,id,"fuse",canJoin) @ t4) 
+ >>
+ (mmsg(id,mode(id,leading(idJ))) @ t)
+  actSnd(id,msg(id,idJ,"fuse",OK(id2,ff,l)) @ t) @ 0
+or
+  none
+  actSnd(id,msg(id,idJ,"fuse",KO) @ t) @ 0
+ 
+--------- joiner role
+ msg(id,idP,"fuse",OK(idLast,ff,l)) @ t2 
+>>
+     mmsg(id,mode(id,fuseRear(idP,idLast,ff,l))) @ t
+     none
+(drops protocol state)     
+
+----------- joiner role
+  msg(id,idP,"fuse",KO) @ t2 
+>>
+  mmsg(id,mode(id,leading(none))) @ t
+  none
+  
+---------------------------i2v msgs
+------------- noplatoon role
+  i2vmsg(id1,id,nuPlatoon) @ t2
+ >>
+   mmsg(id,mode(id,leading(none))) @ t
+   none
+
+------------- leading role
+  i2vmsg(id1,id,join(idP)) @ t2
+>>   
+  mmsg(id,mode(id,fuseStartRear(id,idP))) @ t
+
+----------------- HB msgs
+------------- joiner fuseRear(idP,idLast0,ff0,l0)
+   msg(idP,id,hbl2j(idP,idLast,ff,l)) @ t3)
+  *** updates the mode parameters, no mmmsg
+
+------------- joiner fuseRear(idP,idLast0,ff0,l0)
+   msg(idP,id,joined(idP,idLast,ff,l)) @ t3)
+ 
+ mmsg(id,mode(id,following(idP))) @ t
+ add to lkb
+ (idNext(id,idLast) @ t)
+ (atloc(idLast,l) @ t3)
+ (speed(idLast,ff) @ t3)
+ 
+----------- leading(id)
+   msg(id,idP,hbj2l(idP,idLast,ff,l)) @ t3)
+if joiner close to idlast, 
+  send joined v2v
+  add atloc,speed info for id
+  add id to end of platoon list
+  beome leading(none)
+ow  ignore  
+     
+platoon hbs following(idP)
+   msg(idP,id,hbl2f(idP,ff,l,kb)) @ t3)
+update local kb no mode change
+
+ leading(id?)
+   msg(id,idP,hbf2l(id,ff,l)) @ t3)
+update local kb no mode change
+
+*******************************
+heart beat BCS
+
+leading(none)
+   = v2vBC(id,idL,hbl2f(id,ff,l),t,none) .
+
+leading(id)
+   = v2vBC(id,idL,hbl2f(id,ff,l),t,none) 
+ actSnd(id,
+   msg(id,id1,hbl2j(idP,idlast2,spLast,locLast)) @ t) @ 0 
+   if id2 := getLast(id,idL) .
+
+following(idP)
+   = actSnd(id,msg(id,idP,hbf2l(id,ff,l)) @ t) @ 0 .
+
+fuseRear(idP,idLast,ff,l)
+actSnd(id,msg(idP,id,hbj2l(id,idLast,mysp,myloc)))
+
+
+sent when joiner goes from fuseSTartRear to fuseRear
+  actSnd(id,msg(id,idP,"fuseHB",d(dist)) @ t) 
+!!!not received
+msg(id,idP,hbj2l(id,idlast,d2last,sploc)))
+  
+*******************************
+setMode cases
+
+mode(id,nonplatoon)
+mmsg(id,mode(id,leading(none))) @ t
+
+mode(id,leading(none))
+mmsg(id,mode(id,fuseStartRear(id,idP))) @ t
+
+rcv OK
+fuseStartRear(id,idP)
+mmsg(id,mode(id,fuseRear(idP,idLast,ff,l))) @ t
+
+rcv KO
+fuseStartRear(id,idP)
+mmsg(id,mode(id,leading(none))) @ t
+
+
+rcv CanJoin
+leading(none)
+(mmsg(id,mode(id,leading(idJ))) @ t)
+
+
+rcv joined
+fuseRear(idP,idLast,ff,l)
+mmsg(id,mode(id,following(idP))) @ t
+
+rcv j2l and idj close to idlast
+leading(idj)
+mmsg(id,mode(id,leading(none)))
+  
+********************************************************
+gapNext is currently a sensor reading.
+Each veh knows the veh it is following and could estimate
+gap from speed and loc of that veh reported by leader
+********************************************************
+eq toPrintKB(clock(t) ekb) =
+(if not (25 divides t)
+then none
+else getLocs(v(0) v(1) v(2), ekb,none) getGaps(v(1) v(2), ekb,none) fi) .
+op getLocs : IdSet KB KB -> KB .
+eq getLocs(id ids, (atloc(id,l) @ t) ekb,kb) =
+      getLocs(ids,  ekb,kb (atloc(id,l) @ t)) .
+eq getLocs(ids,ekb,kb) = kb [owise] .
+
+op getGaps : IdSet KB KB -> KB .
+eq getGaps(id ids, (gapNext(id,ff) @ t) ekb,kb) =
+      getGaps(ids,  ekb,kb  (gapNext(id,ff) @ t)) .
+eq getGaps(ids,ekb,kb) = kb [owise] .
+

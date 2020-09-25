@@ -1,0 +1,184 @@
+mod TEST is
+ inc SCENARIO .
+ 
+*** Maude> cont 1 .  
+*** v2 not setting mode
+ 
+op aconf : -> Conf . 
+
+eq aconf =
+.
+
+op getSnd : EventsPair -> EventSet .
+eq getSnd({ievs:EventSet,devs:EventSet}) = devs:EventSet .
+
+op getDevs : TasksEvents -> EventSet .
+eq getDevs({tasks:TaskSet,devs:EventSet}) = devs:EventSet .
+
+op getFst : KBPair -> KB .
+eq getFst({kb0:KB,kb1:KB}) = kb0:KB .
+
+op getKEKLkb : KBEventsKB -> KB .
+eq getKEKLkb({kb0:KB,evs:EventSet,kb1:KB}) = kb0:KB .
+
+op getKEKCkb : KBEventsKB -> KB .
+eq getKEKCkb({kb0:KB,evs:EventSet,kb1:KB}) = kb1:KB .
+
+op getKB : KBEvents -> KB .
+op getEvents : KBEvents -> EventSet .
+eq getKB({kb:KB,evs:EventSet}) = kb:KB .
+eq getEvents({kb:KB,evs:EventSet}) = evs:EventSet .
+
+op getKB : KBEventsEvents -> KB .
+op getBCEvents : KBEventsEvents -> EventSet .
+op getVVEvents : KBEventsEvents -> EventSet .
+eq getKB({kb:KB,bcs:EventSet,vvs:EventSet}) = kb:KB .
+eq getBCEvents({kb:KB,bcs:EventSet,vvs:EventSet}) = bcs:EventSet .
+eq getVVEvents({kb:KB,bcs:EventSet,vvs:EventSet}) = vvs:EventSet .
+
+op ekb : -> KB . 
+eq ekb =
+ .
+ 
+ops lkb lkb0 lkb1 lkb2 kb0 kb1 skb : -> KB .
+eq lkb = 
+ .
+
+**** {skb,ekb'}
+eq skb =  getFst(readSensors(v(2),(locS speedS gapS),ekb)) .
+eq lkb2 = proSensors(v(2),lkb,skb) .
+ 
+ops tsks tsks1 : -> TaskSet .
+eq tsks = ( v2v(v(2), i2vmsg(i(0), v(2), join(v(0))) @ 21)
+           v2v(v(2), msg(v(0), v(2), "fuse", 
+                     OK(v(1), 20, loc(1337))) @ 21) ) .
+eq tsks1 = (tick tsks) .
+
+
+op kekset : -> KBEventsKBSet .
+*** kekset 
+*** doTasks(veh, v(2), tsks1,none,none, skb, lkb) 
+*** red doTasks$(veh, v(2),tsks1,none,lkb2,none,none) .
+***(
+ {clock(22) class(v(2), veh) (lastAct(actSpeed(v(2), 22, 28)) @ 22) (atloc(v(2), loc(650)) @ 22) (mode(v(2), fuseStartRear(v(2), v(0))) @ 20) (speed(v(2), 25) @ 22) (gapNext(v(2), 727) @ 22) maxAcc(v(2), 3) gapGreen(v(1), 2, 3) gapSafety(v(1), 2, 4),
+ (tick @ 1) {u(1),actSpeed(v(2), 22, 28)} @ 0,
+    (none).KB}
+red doTask(veh, v(2),( v2v(v(2), i2vmsg(i(0), v(2), join(v(0))) @ 21),none,none,none,lkb2) .
+  )
+
+
+
+***(
+ops evs evs0 evs1 evs2 devs devs0 devs1 devBCs devV2V ckbevs : -> EventSet .
+ kekset := doTasks(cl, id, task tasks,ievs, devs1, skb, lkb) 
+)
+
+***(
+ops kekset0 kekset : -> KBEventsKBSet .
+eq lkb1 = getKEKLkb(kekset0) .
+eq devs1 = getKEKEvents(kekset0) .
+eq kb1 = getKEKCkb(kekset0) .
+)
+
+endm
+
+   
+***(
+crl[doTasks]:
+[id : cl | lkb : lkb, evs : ((task @ 0) evs), ckb : ckb, 
+           sensors : sset, ats] [eid | ekb ]
+=>
+[id : cl | lkb : lkb', evs : evs',  ckb : ckb', sensors : sset, ats]
+[eid | ekb' ]
+if t := getTime(lkb)
+/\ {ievs,devs} := splitEvents(evs,none)
+/\ {tasks,devs1} := splitTasks0(devs,none)
+/\ {skb,ekb'} := readSensors(id,sset,ekb)
+/\ kekset := doTasks(cl, id, task tasks,ievs, devs1, skb, lkb) 
+/\ {lkb', evs', kb} kekset0 := selectKeK(lkb,kekset)
+/\ ckb' := addK(ckb,kb)
+.
+)
+
+***(
+
+  ceq doTasks(cl,id,tsks,ievs,devs,skb,lkb)
+   = doTasks$(cl,id,tsks1,devs,lkb2,none,none)
+   if lkb0 := handleS(cl,id,lkb,ievs)
+   /\ lkb2 := proSensors(id,lkb0,skb)
+   /\ tsks1 := validTasks(id,lkb,tsks,none) .
+
+  ceq doTasks$(cl,id,tsk tsks,devs,lkb,devs0,kb0) 
+   = doTasks$(cl,id,tsks,devs,lkb1,devs1 devs0,kb1 kb0)
+   if not (tsk == tick)
+   /\ {lkb1,devs1,kb1} := doTask(cl,id,tsk,none,devs,none,lkb) .
+
+  ceq doTasks$(cl,id,tick,devs,lkb,devs0,kb0)
+   = add(devs0,kb0,kbevkbset,none)
+   if kbevkbset := doTask(cl,id,tick,none,devs,none,lkb) .
+
+doTask(veh,v(2),v2v(v(2), i2vmsg(i(0), v(2), nuPlatoon) @ 15),none,none,none,lkb2) 
+
+  ceq doTask(cl,id,v2v(id,tmsg),
+             ievs,devs,skb,lkb) 
+   = {lkb4,devs0 devV2V,kbp}
+       *** Handle immediate events  --- noop already done
+   if lkb0 := handleS(cl,id,lkb,ievs)
+       *** process sensors  --- noop already done
+   /\ lkb2 := proSensors(id,lkb0,skb)
+       *** Handle the (cyber) communication, i.e., v2v message
+   /\ {lkb3,devs0} := handleX(id,lkb2,tmsg)
+       *** Update mode, e.g., emergency braking
+   /\ {lkb4,devBCs,devV2V} := setMode(id,lkb3) 
+       *** Share broadcast actions
+   /\ {kbp,none} := tell(id,devBCs) .
+
+)
+ 
+  
+
+
+***(  
+crl[timeStep]:
+{ aconf } 
+=> 
+{ aconf2 }
+if nzt := mte(aconf)
+/\ t := getTime(envKB(aconf))
+/\ evs := effActs(aconf)
+/\ ekb0 := doEnvAct(t, nzt, envKB(aconf), evs) 
+/\ ekb' := resolveKB(getEnvId(aconf), ekb0, envKB(aconf))
+/\ aconf0 := updateEnv(ekb',timeEffect(aconf,nzt))
+/\ aconf1 := shareKnowledge(aconf0)
+/\ aconf4 := processNet(aconf1)
+/\ aconf3 := updateLog(aconf4, t,nzt,evs)
+/\ aconf2 := updateConf(aconf3) 
+/\ ekb1 := toPrintKB(ekb')
+[print "eAct: " ekb1 "\ntimeStep: " t " ++ " nzt] 
+.
+   
+)
+***(
+op evs : -> EventSet .
+eq ekb0 = doEnvAct(0, 1, ekb, evs) .
+
+ops aconf0 aconf1 aconf2 aconf3 aconf4 : -> Conf .
+eq aconf0 = updateEnv(ekb',timeEffect(aconf,1)) .
+eq aconf1 = shareKnowledge(aconf0) .
+*** aconf0 == aconf1
+
+eq aconf4 = processNet(aconf1) .
+eq aconf3 = updateLog(aconf4, 0,1,evs) .
+eq aconf2 = updateConf(aconf3)  .
+eq ekb1 = toPrintKB(ekb') .
+)
+***(
+50 v0 4000 v1 3937 (63) v2 3850 (87)
+151 v0 4020 v1 3957 (63) v2 3875 (82)
+153 v0 4060 v1 3997 (63) v2 3925 (72)
+157 v0 4140 v1 4077 (63) v2 4025 (52)
+158 v0 4160 v1 4097 (63) v2 4050 (47)
+)
+[eId |
+  clock(160) class(v(0), veh) class(v(1), veh) class(v(2), veh) class(i(0), infra) (atloc(v(0), loc(4200)) @ 160) (atloc(v(1), loc(4137)) @ 160) ( atloc(v(2), loc(4100)) @ 160) (speed(v(0), 20) @ 160) (speed(v(1), 20) @ 160) (speed(v(2), 25) @ 160) (accel(v(0), 0) @ 160) (accel(v(1), 0) @ 160) (accel(v(2), 0) @ 160)
+]

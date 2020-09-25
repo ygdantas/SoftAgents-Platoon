@@ -1,0 +1,55 @@
+***(
+load ../../Lib/load-sa
+
+load knowledge
+load sensor-faults
+
+load scp
+load tasks
+load actions
+load scenario
+)
+
+***load ../../Lib/load-sa
+
+***(
+*** Slow-injection attack
+load ../../Lib/time
+load ../../Lib/rat2fstr
+load ../../Lib/knowledge
+load ../../Lib/rval
+load ../../Lib/events
+load ../../Lib/soft-agents
+load ../../Lib/solve-scp
+
+load knowledge
+load sensor-faults
+load scp
+load tasks
+load actions
+load intruderList
+load intruder
+load sa-rules-ygd
+load scenario
+)
+
+
+
+*** join attack
+load ../../Lib/time
+load ../../Lib/rat2fstr
+load ../../Lib/knowledge
+load ../../Lib/rval
+load ../../Lib/events
+load ../../Lib/soft-agents
+load ../../Lib/solve-scp
+
+load knowledge
+load sensor-faults
+load scp
+load tasks
+load actions
+load intruderSet
+load intruder
+load sa-rules-ygd
+load scenario

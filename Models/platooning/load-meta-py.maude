@@ -1,0 +1,28 @@
+load load-sim
+
+load model-checker 
+load ../../../../imaude/ilib/load-lib
+load ../../Lib/meta-sa 
+loop init .
+
+
+**** testing with just maude
+***(seq
+**** simname == unKnown => MaudePhysics
+**** maudename plambda plambda simname amodname initname randinc 
+(initAgentEset maude plambda plambda unKnown SCENARIO-SIM scenario-simple unKnown  300) 
+)
+
+
+(seq
+ (pyexe plambda (load "../../Lib/PyLsp/pseudosim-py.lsp"))
+**** init veh/world
+***(pyexe plambda (let ((v0 (apply initVeh "v(0)" (float 1000) (float 25))) (v1 (apply initVeh "v(1)" (float 945) (float 20))) ) (setUID v0 "v(0)") (setUID v1 "v(1)") (apply initWorld "w0" (mklist v0 v1) (float 4)) ))
+**** simname == unKnown => MaudePhysics
+**** maudename g2dname g2dvname simname amodname initname wid randinc 
+***(initAgentEset maude plambda plambda plambda SCENARIO-SIM scenario-simple w0 300) 
+)
+
+****(g2dexe g2d (load (sinvoke "g2d.util.IO" "interpretTilde" "~/Repositories/imaude/jlib/jl-util.lsp")))
+
+**** (loadg2dlib g2d ../../Lib/stats-funs.lsp)

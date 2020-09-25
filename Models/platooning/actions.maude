@@ -1,0 +1,125 @@
+fmod ENV-ACTIONS is
+  inc MODEL-ACTIONS .
+	inc RANDOM .
+  inc FAULT-MODEL .
+  inc MODEL-TASKS .  --- v2v is defined here.  Should be in knowledge ?
+  
+  vars t t' t0 t1 t2 t3 t4 t5 t6 : Nat .
+  var nzt : NzTime .
+  vars id id' id0 st eid : Id .
+  vars l l0 l1 l2 l3 loc : Loc .
+  vars lkb ekb ekb' ekb0 ekb1 : KB .
+  var b b0 b1 b2 : Bool .
+  var evs : EventSet .
+  vars fp0 fp1 rp0 rp1 ff ff0 ff1 ff2 ff3 ff4 ff5 : Rat .
+	var n r j i  e e0 e1 : Nat .
+***  var act : Act .
+*** var ftype : FType .
+***  var fpars : FPars .
+  var rv : RVal .
+  var cl : Class .
+  var tmsg : TMsg .
+  var cnt : Content .
+  var ats : AttributeSet . 
+  var aconf : Conf .
+  
+  eq okEnv(class(id,veh)  (atloc(id, l1) @ t) 
+                 class(id',veh) (atloc(id',l1) @ t) ekb) = false .
+  eq okEnv(ekb) = true [owise] .
+
+ ***(
+ newLocff(oldLocff,sp,acc) = oldLocff + sp + (acc / 2)
+ done for all veh before individual acts
+
+ op actSpeed : Id Rat Rat -> Action [ctor] .  
+      next speed range -- pick middle
+      next accel is next speed - old speed
+     
+ op actSnd : Id TMsg -> Action [ctor] .  
+
+ actSnd(id,tmsg) should become v2v(id,tmsg) @ 0 (after timeEffect)
+ in devs of msg target
+ doEAct collects these tasks in 
+ op netTasks : Tasks -> Info .
+ updateConf can deliverthem
+
+   op actBCast : Id KB -> Action [ctor] . 
+     kb to be shared -- handled by doTask$
+ )
+ 
+ *** physics model of action
+ *** returns only the updates (so far only local to action id)
+ op doEAct : Time Action KB -> KB .
+
+**** pick the middle speed,  eventually could pick randomly
+**** probably should check that new accel is ok
+    
+eq doEAct(t, actSnd(id,tmsg), ekb) =  (net(tmsg) @ s t) .
+
+*** eq doEAct(t, actSndI(id,tmsg), ekb) = (netI(tmsg) @ s t) .
+
+***(clt 20mar20 
+shouldn't assume speed, accel have same time stamp 
+why should accel remain the same when the speed changes?
+Accelleration needed to reach sp1 from sp0 in 1 time unit
+sp1 - sp0 = a            
+Why floor?  Could introduce a lot of error
+)
+ceq doEAct(t, actSpeed(id,ff0,ff1), 
+             (speed(id,ff2) @ t0) (accel(id,ff3) @ t1) ekb)
+   =
+    (speed(id, (ff4 / ff5)) @ s t)
+    --- (accel(id, ((ff1 + ff0) / 2) - ff2 ) @ s t) 
+     (accel(id,ff3) @ s t) 
+ if ff5 := 1
+ /\ ff4 := floor(ff5 * ((ff1 + ff0) / 2)) .
+
+
+---- performs actions for one-time unit 
+***  op doUnitEnvAct : Time KB EventSet -> KB .
+***(
+update vehicle locations; then do each agents acts
+will generate loc, speed, accel updates
+will also generate v2v network msgs net(tmsg)
+they need to be processed before the timestep is over
+) 
+**** newloc based on travel for 1s 
+op updateVLocs : Nat KB KB -> KB .
+eq updateVLocs(t,ekb,ekb0) = ekb0 [owise] .
+eq updateVLocs(t,ekb class(id,veh) (atloc(id,loc(ff)) @ t0)
+                    (speed(id,ff1) @ t1) (accel(id,ff2) @ t2), ekb0) 
+   = updateVLocs(t, ekb, ekb0 (atloc(id,loc(ff + ff1 + (ff2 / 2))) @ s t)) .
+
+
+op doUnitEnvActX : Time KB KB EventSet -> KB .
+
+eq doUnitEnvAct(t,ekb, evs) =  
+       doUnitEnvActX(t,ekb,updateVLocs(t,ekb,none),evs) .
+
+ceq doUnitEnvActX(t,ekb, ekb0, (a:Action @ 0) evs) =
+       doUnitEnvActX(t,ekb,addK(ekb1,ekb0),evs)
+if ekb1 := doEAct(t,a:Action,ekb) .
+
+ceq doUnitEnvActX(t,ekb, ekb0, ({rv, a:Action} @ 0) evs) =
+       doUnitEnvActX(t,ekb,addK(ekb1,ekb0),evs)
+if ekb1 := doEAct(t,a:Action,ekb) .
+
+eq doUnitEnvActX(t,ekb, ekb0, none) = ekb0 .
+
+********** dealing with net items using updateConf .
+
+***** for instrumenting
+***  op processNet : Conf -> Conf .
+***  eq processNet(aconf) = aconf [owise] .
+
+
+ceq processNet([id : cl | evs : evs, ats] aconf
+              [eid | ekb (net(tmsg) @ t1)])
+=
+processNet([id : cl | evs : (evs (v2v(id,tmsg) @ 0)), ats] 
+          aconf
+          [eid | ekb]) 
+ if getRecId(tmsg) == id .
+
+endfm
+

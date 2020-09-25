@@ -1,0 +1,259 @@
+fmod MODEL-KNOWLEDGE is
+  inc SOFT-AGENTS .
+  inc CONVERSION .
+  inc RANDOM .
+
+  vars t t0 t1 t2 t3 t4 t5 t6 : Time .
+  var n i j j0 j1 n0 n1 e e0 e1 e2 : Nat .
+  vars x y x1 y1 x0 y0 xll xur yll yur i0 i1 : Int .
+  vars id id0 id1 : Id .
+  var cl : Class .
+  vars l l0 l1 l2 l3 loc : Loc .
+  vars ll ll0 ll1 ur ur0 ur1 pt0 pt1 pt dl0 dl1 : Pt2 .
+  vars ekb ekb0 ekb1 kb  lkb kb1 lkb0 kb0 kb2 :  KB .
+  vars dir dir0 dir1 : Pt2 . **** Dir .
+  vars  ff ff0 ff1 fp0 fp1 rp0 rp1 : Rational .
+  vars act act0 act1 : Action .
+
+**** Measure charge in % full
+**** Max is thus 100
+
+**** scenario parameters
+
+**** Model specific classes
+   sort VClass .
+   subsort VClass < Class .
+   op veh : -> BotClass [ctor] .
+*** non Bot classes
+
+*** roles
+  sort Mode .
+  ops nonplatoon leading following 
+      fuseStartRear fuseRear fuseOutStart 
+      fuseOut emergency 
+      split : -> Mode .
+  *** In off mode, the second parameter is not important.
+  op mode : Id Id Mode -> Info .
+  *** nearby platoons
+  op platoon : Id Ids -> Info .
+*** Types of gap
+*** Probably all vehicles in a platoon 
+*** have the same gap type.
+  sort GapType .
+  op gapTime : Rational -> GapType .
+  op gapClear : Rational -> GapType .
+  op gapSafety : Rational -> GapType .
+  op gap : Id GapType -> Info .
+
+*** Maximum accelaration
+  op maxAcc : Id Rational -> PKItem .
+
+**** max communication distance
+  op comDist : Nat -> PKItem [ctor] .
+  op getComDist : KB -> Nat .
+  eq getComDist(comDist(n) kb) = n .
+  eq getComDist(kb) = 0 [owise] .
+
+  op getComDistKI :  KB -> KB .
+  eq getComDistKI(comDist(n) kb) = comDist(n) .
+  eq getComDistKI(kb) = none [owise] .
+
+*** Comm sharing
+  *** v2all(true) denotes that all vehicles in the platoon
+  *** can share data among each other. 
+  *** v2all(false) denotes that only vehicle to leader comm
+  *** is allowed.
+  op v2all : Bool -> PKItem .
+  op v2v : Bool -> PKItem .
+  op i2v : Bool -> PKItem .
+
+**** for modeling faults 
+  op randInc : Nat -> KItem .
+  op rand : Id Nat Nat -> Info .
+
+**** abstracting random numbers to [0,1]
+  ops randMax rand.25 rand.5 rand.75 rand.125 : -> Nat .
+  eq randMax = 4294967295 .
+  eq rand.25 = 1073741824 .
+  eq rand.5  = 2147483647 .
+  eq rand.75 = 3221225471 .
+  eq rand.125 = 536870912 .
+
+*** partial order
+****  eq (clock(t0)) << (clock(t1)) = t0 < t1 .
+  eq (mode(id,id2,md) @ t0) << (mode(id,id3,md1) @ t1) = t0 < t1 .
+  eq (gap(id,gmd) @ t0) 
+         << (gap(id,gmd1) @ t1) = t0 < t1 .
+  eq (platoon(id,ids) @ t0) 
+         << (platoon(id,ids0) @ t1) = t0 < t1 .
+  eq (rand(id,n0,j0) @ t0) << (rand(id,n1,j1) @ t1) = t0 < t1 .
+
+*** sensors
+  op speed : Id Rational -> Info .
+  op gapNext : Id Rational -> Info .
+  op commDelay : Id Rational -> Info .
+  eq (speed(id,ff) @ t0) 
+         << (speed(id,ff1) @ t1) = t0 < t1 .
+  eq (gapNext(id,ff) @ t0) 
+         << (gapNext(id,ff1) @ t1) = t0 < t1 .
+  eq (commDelay(id,ff) @ t0) 
+         << (commDelay(id,ff1) @ t1) = t0 < t1 .
+         
+endfm  
+
+******** bot  actions
+fmod MODEL-ACTIONS is 
+  inc MODEL-KNOWLEDGE .  
+
+  vars t t0 t1 t2 t3 t4 t5 t6 : Time .
+  var n i j j0 j1 n0 n1 e e0 e1 e2 : Nat .
+  var cl : Class .
+  vars ekb ekb0 ekb1 kb  lkb kb1 lkb0 kb0 kb2 :  KB .
+  vars  ff ff0 ff1 fp0 fp1 rp0 rp1 : Rat .
+  vars act act0 act1 : Action .
+  var md : Mode .
+  var actsFuseStart : ActSet .
+
+  *** actAcc
+  op actSpeed : Id Rational Rational -> Action [ctor] .
+  --- op actGap : Id -> Action [ctor] .
+  op actMode : Id Mode -> Action [ctor] .
+  
+  op actId : Action ~> Id .
+  eq actId(actSpeed(id,ff1,ff2)) = id .
+  eq actId(actMode(id,md)) = id .
+ 
+********* helpers
+
+  op getMode : KB -> Mode .
+  eq getMode((mode(id,id2,md) @ t) kb) = md .
+  op getPlatoon : KB -> Ids .
+  eq getPlatoon((platoon(id,ids) @ t0) kb) 
+    = ids .
+  op getSpeed : Id KB -> Rational .
+  eq getSpeed(id, (speed(id,ff) @ t0) kb) 
+    = ff .
+  op getMaxAcc : Id KB -> Rational .
+  eq getMaxAcc(id,(maxAcc(id,ff) @ t0) kb) 
+    = ff .
+  op monus : Rational Rational -> Rational .
+  eq monus(ff,ff1) = if ff1 >= ff1 then 0
+                     else ff - ff1 fi .
+
+  op mkFuseStartActs : Id Ids ActSet -> ActSet .
+  eq mkFuseStartActs(id,id1 ids,acts) 
+   = mkFuseStartActs(id,id1 ids,acts 
+         actMode(id,mode(id,id1,fuseStartRear))) . 
+  eq mkFuseStartActs(id,none,acts) = acts .
+
+  op mkSpeedAct : Id KB -> Action .  
+  ceq mkSpeedAct(id,lkb) 
+   = actSpeed(id,monus(spd,acc),spd + acc) 
+   if spd := getSpeed(id,lkb)
+   /\ acc := getMaxAcc(id,lkb) .
+
+**** Implement the mode automaton.
+ op myActs : Class Id KB -> ActSet .
+ 
+ *** non-platooning mode. 
+ ceq myActs(cl,id,lkb) 
+  = actLead actEmergency 
+    mkSpeedAct(id,lkb) 
+  if getMode(lkb) == mode(id,id,nonplatoon)
+  /\ actLead :=
+      actMode(id,mode(id,id,leading))
+  /\ actEmergency :=
+      actMode(id,mode(id,id,emergency)) .
+
+ *** leading mode. 
+ ceq myActs(cl,id,lkb) 
+  = actsFuseStart actEmergency
+    mkSpeedAct(id,lkb)
+  if getMode(lkb) == mode(id,id,leading) 
+  /\ ids := getPlatoons(lkb)
+  /\ actsFuseStart := mkFuseStartActs(id,ids,acts) 
+  /\ actEmergency :=
+      actMode(id,mode(id,id,emergency)) .
+
+*** following
+
+*** fuseStartRear
+
+*** fuseRear
+
+*** fuseOutStart
+
+*** fuseOut
+
+*** fuseEmergency
+
+*** emergency
+
+*** split
+ 
+*** agents model of action = maude physics when no interference
+*** returns the kb update
+
+*** actSpeed(id,ff1,ff2)
+*** actMode(id,md)  .
+op doAct :  Action KB -> KB .
+
+*** Probably need to compute the gapNext
+eq doAct(actSpeed(id,ff1,ff2),
+        (clock(t)) 
+        (speed(id,ff) @ t1) kb) 
+ = if ff1 == ff2 then 
+    (speed(id,ff1) @ s t)
+   else 
+    (speed(id,ff1) @ s t) fi .
+
+eq doAct(a:Action,kb) = none [owise] .
+  
+endfm
+
+fmod FAULT-MODEL is
+  inc MODEL-KNOWLEDGE .
+  
+***(
+physical knowledge
+ class(id,cl)
+ atloc(id,loc) @ t
+ gapNext
+ speed(id,fp)
+ accel(id,fp)  
+
+sensor names 
+  locS
+  gapS
+  speedS
+  vehS
+
+Actions
+actSpeed(id,spmin,spmax)
+) 
+
+**** Fault/Failure model  
+
+sort FVal .
+op ffV : Rat -> FVal .
+op intV : Int -> FVal .
+
+vars  ff ff0 ff1  : Rat .
+vars i0 i1 : Int .
+
+op sum : FVal FVal -> FVal .
+op mult : Int FVal -> FVal .
+
+eq sum(ffV(ff0), ffV(ff1)) = ffV(ff0 + ff1) .
+eq sum(intV(i0), intV(i1)) = intV(i0 + i1) .
+
+sorts FType FPars .
+op simpleFT : -> FType [ctor] .
+op sFP : Rat Rat FVal -> FPars [ctor] .
+
+op boolFT : -> FType [ctor] .
+op bFP : Rat -> FPars [ctor] .  *** prob of fail
+
+
+endfm
+

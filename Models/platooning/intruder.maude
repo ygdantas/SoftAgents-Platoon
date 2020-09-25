@@ -1,0 +1,118 @@
+mod INTRUDER-MODEL is
+ inc SOFT-AGENTS .
+ inc CONVERSION .
+ inc RANDOM .
+ inc RAT .
+ inc MODEL-KNOWLEDGE .
+ inc MODEL-ACTIONS .
+
+ vars iattrs : IAttrs .
+ vars asys asys1 : ASystem .
+ vars eId iid id : Id .
+ var ids : IdSet .
+ var imsg : Msg .
+ var t0 cnt : Nat .
+ var imsgs : Msgs .
+ var kb : KB .
+ var conf : Conf .
+ vars agent agent1 : Agent .
+ var cl : Class .
+ var attrs : AttributeSet .
+ vars ev ev1 : Event .
+ var evs : EventSet .
+ var tmsg : TMsg .
+ sort IdBool .
+ op {_;_;_} : Id Bool Nat -> IdBool .
+ sort IdBoolSet .
+ subsort IdBool < IdBoolSet .
+ op none : -> IdBoolSet .
+ op __ : IdBoolSet IdBoolSet -> IdBoolSet [ctor assoc comm id: none] .
+ var idsBools : IdBoolSet .
+ sort Msgs .
+ subsort Msg < Msgs .
+ op none : -> Msgs .
+ op __ : Msgs Msgs -> Msgs [ctor assoc comm id: none] .
+ sorts Intruder ASystemIntruder IAttr IAttrs .
+ subsort IAttr < IAttrs .
+ op none : -> IAttrs [ctor] .
+ op __ : IAttrs IAttrs -> IAttrs [ctor assoc comm id: none format (d ni d)] .
+ op intruder : -> Class .
+ op [_:_|_] : Id Class IAttrs -> Intruder [ctor format (n d d d d n++i --i d)] .
+ op {_;_} : ASystem Intruder -> ASystemIntruder .
+ op v2vMsgs`:_ : Msgs -> IAttr .
+ op blockActSnd`:_;_ : IdSet Nat -> IAttr .
+ op blockActSndSet`:_ : IdBoolSet -> IAttr . 
+
+*** Id Bool (create new sort)
+*** create sort IdBoolSet (comm..ass..)
+*** RULE TO INJECT A MESSAGE
+ crl { asys ; [iid : intruder | (v2vMsgs : (imsg imsgs)) iattrs] }
+  => { asys1 ; [iid : intruder | (v2vMsgs : imsgs) iattrs] }
+  if t0 := getTime(asys)
+  /\ asys1 := insertMsg(iid,t0,asys,imsg) .
+
+ op getTime : ASystem -> Nat .
+ eq getTime({[eId | clock(t0) kb] conf}) = t0 .
+
+ op insertMsg : Id Nat ASystem Msg -> ASystem .
+ ceq insertMsg(iid,t0,{agent conf},imsg)
+  = {agent1 conf}
+  if [id : cl | (evs : evs), attrs] := agent
+  /\ id == getRecId(imsg) 
+  /\ ev := v2v(id,imsg @ t0) @ 0
+  /\ agent1 := [id : cl | (evs : (ev evs)), attrs] .
+
+*** RULE TO REMOVE A MESSAGE
+*** Probably a better way to do this.
+ crl { asys ; 
+      [iid : intruder | (blockActSnd : ids ; cnt) iattrs] }
+  => { asys1 ; 
+      [iid : intruder | (blockActSnd : ids ; cnt + 1) iattrs] }
+  if asys1 := remActSnds(asys,ids)
+  /\ not (asys == asys1) .
+
+
+*** [intruder-block-active]
+ rl { asys ; 
+      [iid : intruder | (blockActSndSet : ({id ; false ; cnt} idsBools) ) iattrs] }
+  => { asys ; 
+      [iid : intruder | (blockActSndSet : ({id ; true ; cnt} idsBools) ) iattrs] } .
+
+*** [intruder-block]
+ crl { asys ; 
+      [iid : intruder | (blockActSndSet : ({id ; true ; cnt} idsBools) ) iattrs] }
+  => { asys1 ; 
+      [iid : intruder | (blockActSndSet : ({id ; true ; cnt + 1} idsBools) ) iattrs] }
+  if asys1 := remActSnds(asys,({id ; true ; cnt + 1} idsBools))
+  /\ not (asys == asys1) .
+
+***(
+ rl { asys ; 
+      [iid : intruder | (blockActSndSet : ({id ; false} idsBools) ) iattrs] }
+  => { asys ; 
+      [iid : intruder | (blockActSndSet : ({id ; false} idsBools) ) iattrs] } .
+ )
+
+
+
+*** Create new rl where intruder can decided whether the attack is active (true/false)
+
+op remActSnds : ASystem IdSet -> ASystem .
+ceq remActSnds({ agent conf }, id ids)
+ =  remActSnds({ agent1 conf }, id ids)
+ if [id : cl | (evs : ((actSnd(id,tmsg) @ t0) evs)), attrs] := agent
+ /\ agent1 :=  [id : cl | (evs : evs), attrs] .
+eq remActSnds(asys,ids) = asys [owise] .
+
+op remActSnds : ASystem IdBoolSet -> ASystem .
+ceq remActSnds({ agent conf }, {id ; true ; cnt} idsBools)
+ =  remActSnds({ agent1 conf }, {id ; true ; cnt} idsBools)
+ if [id : cl | (evs : ((actSnd(id,tmsg) @ t0) evs)), attrs] := agent
+ /\ agent1 :=  [id : cl | (evs : evs), attrs] .
+
+eq remActSnds(asys,idsBools) = asys [owise] .
+
+
+endm
+
+eof

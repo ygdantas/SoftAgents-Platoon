@@ -1,0 +1,149 @@
+load test-plausibility .
+***load intruder .
+
+mod TEST-INTRUDER-DROP-EMERGENCY is
+  inc TEST-FOLLOWING-DROPPED-EMERGENCY .
+  inc INTRUDER-MODEL-SET .
+
+ vars n clck cnt : Nat .
+ var msgs : Msgs .
+ var intr : Intruder .
+ var conf : Conf .
+ var attrs : AttributeSet .
+ vars kb kb0 kb1 : KB .
+ vars t0 t1 t2 t3 : Nat .
+ vars ff ff0 ff1 ff2 ffL ffH spdv0 spdv1 spdv2 : Rat .
+ var int : Intruder .
+ var asys scario : ASystem .
+ var iasys : ASystemIntruder .
+ var agent agent1 agent2 agent3 : Agent .
+ var cl : Class .
+ var id0 : Id .
+ var env : Env .
+ var b : Bool .
+ var v : IdSet .
+ var cls : Class .
+ var evs : EventSet .
+
+ op imsgs : -> Msgs .
+
+
+ op genMsgs : Rat Nat Msgs -> Msgs .
+ eq genMsgs(ff,s n,msgs) 
+  = genMsgs(ff,n, msg(v(0),v(1), hbl2f(v(0),ff,loc(1000 + ff * (s n)),none)) msgs) .
+ eq genMsgs(ff,0,msgs) = msgs .
+
+ op iid : -> Id .
+ op intruder : Rat Nat -> Intruder .
+ eq intruder(ff,n) =
+   [iid : intruder |
+      (v2vMsgs : genMsgs(ff,n,none))
+      (blockActSndSet : { v(0) ; false ; 0} )
+      ] .
+
+ op asysint : Rat Nat -> ASystemIntruder .
+ eq asysint(ff,n) =
+  {emergency-scenario ; intruder(ff,n)} .
+
+ op asys2 : -> ASystemIntruder .
+
+ op crash : ASystemIntruder -> Bool .
+ op crash$ : Env -> Bool .
+ ceq crash({ {conf env} ; int})
+  = true 
+  if crash$(env) .
+
+  eq crash$([id0 |
+   (atloc(v(1), loc(ff1)) @ t1)
+   (atloc(v(0), loc(ff0)) @ t2) 
+    kb]) = ff1 >= ff0 .
+
+
+op getAgtFromConf : ASystemIntruder -> Agent .
+eq getAgtFromConf({ { agent1 agent2 conf env } ; int }) = agent2 .
+
+
+op noLogs : ASystemIntruder -> Bool .
+op noLogs$ : Agent -> Bool .
+ 
+ceq noLogs({ scario ; int})
+ = true 
+ if noLogs$(getAgtFromConf({ scario ; int})) .
+
+ceq noLogs$( [v(1) : cl | 
+            lkb : kb0,
+            ckb : none,
+            sensors : (locS speedS gapS), 
+            evs : evs ] 
+             )
+= if ( (cnt == 0) )  then
+    true
+  else
+    false
+  fi 
+if (logSpdPlCkFail(v(1), v(0), cnt) @ t1) (mode(v(1), following(v(0))) @ t2) kb := kb0 .
+
+endm
+
+eof
+*** new load; blocking ***
+search [1] in TEST-INTRUDER-DROP-EMERGENCY : asysint(20, 1) =>* iasys such that crash(iasys) and noLogs(iasys) = true .
+
+Solution 1 (state 6538)
+states: 6539  rewrites: 728487 in 832ms cpu (837ms real) (875585 rewrites/second)
+iasys --> {{
+[eId |
+  clock(12) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1216)) @ 12) (atloc(v(1), loc(1216)) @ 12) (speed(v(0), 1) @ 12) (speed(v(1), 14) @ 12) (accel(v(0), 0) @ 12) accel(v(1),
+    0) @ 12] 
+[v(0) : veh |
+  lkb : (clock(12) class(v(0), veh) (lastAct(actSpeed(v(0), 1, 1)) @ 11) (atloc(v(0), loc(1212)) @ 11) (atloc(v(1), loc(1007)) @ 3) (mode(v(0), emergency) @ 4) (speed(v(0), 4) @ 11) (speed(v(1), 23) @ 3)
+    maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 17, loc(1199))) @ 11) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(12) class(v(1), veh) (lastAct(actSpeed(v(1), 14, 14)) @ 11) (atloc(v(0), loc(1075)) @ 3) (atloc(v(1), loc(1199)) @ 11) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(
+    0), 25) @ 3) (speed(v(1), 17) @ 11) (gapNext(v(1), 13) @ 11) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (25 @ 3) ; (25 @ 2) ; 25 @ 1) @ 3) maxAcc(v(1), 3)
+    gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(12) (atloc(v(0), loc(1212)) @ 11) (atloc(v(1), loc(1199)) @ 11) i2vTrigger(i(0), v(0), 1100, 50, i2vEmergency(v(0))) @ 0),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgs : msg(v(0), v(1), hbl2f(v(0), 20, loc(1020), none))
+  blockActSndSet : {v(0) ; true ; 0}]}
+
+
+search [1] in TEST-INTRUDER-DROP-EMERGENCY : asysint(20, 1) =>* iasys such that crash(iasys) and noLogs(iasys) .
+
+Solution 1 (state 22254)
+states: 22255  rewrites: 12183355 in 12816ms cpu (12815ms real) (950636 rewrites/second)
+iasys --> {{
+[eId |
+  clock(12) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1216)) @ 12) (atloc(v(1), loc(1222)) @ 12) (speed(v(0), 1) @ 12) (speed(v(1), 24) @ 4) (accel(v(0), 0) @ 12) accel(v(1),
+    0) @ 4] 
+[v(0) : veh |
+  lkb : (clock(12) class(v(0), veh) (lastAct(actSpeed(v(0), 1, 1)) @ 11) (atloc(v(0), loc(1212)) @ 11) (atloc(v(1), loc(1007)) @ 3) (mode(v(0), emergency) @ 4) (speed(v(0), 4) @ 11) (speed(v(1), 23) @ 3)
+    maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[v(1) : veh |
+  lkb : (clock(12) class(v(1), veh) (lastAct(actSpeed(v(1), 95/4, 27)) @ 4) (atloc(v(0), loc(1020)) @ 4) (atloc(v(1), loc(1030)) @ 4) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(
+    0), 20) @ 4) (speed(v(1), 24) @ 4) (gapNext(v(1), 70) @ 4) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (20 @ 4) ; (25 @ 3) ; 25 @ 2) @ 4) maxAcc(v(1), 3)
+    gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : none] 
+[i(0) : infra |
+  lkb : (clock(12) (atloc(v(0), loc(1212)) @ 11) (atloc(v(1), loc(1198)) @ 11) i2vTrigger(i(0), v(0), 1100, 50, i2vEmergency(v(0))) @ 0),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgs : none
+  blockActSndSet : {v(0) ; true ; 1}]}

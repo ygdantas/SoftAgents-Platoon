@@ -1,0 +1,84 @@
+load test-plausibility .
+load intruder .
+
+mod TEST-SAFETY is
+  inc TEST-SIMPLE-FOLLOWING-SAFETY .
+  inc INTRUDER-MODEL .
+
+ var n : Nat .
+ var msgs : Msgs .
+ var intr : Intruder .
+ var conf : Conf .
+ var attrs : AttributeSet .
+ vars kb kb0 : KB .
+ vars t0 t1 t2 : Nat .
+ vars ff ff0 ff1 ffL ffH : Rat .
+ var int : Intruder .
+ var asys : ASystem .
+ var iasys : ASystemIntruder .
+ var agent : Agent .
+ var cl : Class .
+ var id0 : Id .
+ var env : Env .
+
+ op imsgs : -> Msgs .
+
+ op genMsgs : Rat Nat Msgs -> Msgs .
+ eq genMsgs(ff,s n,msgs) 
+  = genMsgs(ff,n,msg(v(0),v(3), 
+    hbl2f(v(0),ff,loc(1000 + ff * (s n)),none)) msgs) .
+ eq genMsgs(ff,0,msgs) = msgs .
+
+ op iid : -> Id .
+ op intruder : Rat Nat -> Intruder .
+ eq intruder(ff,n) 
+   = [iid : intruder |
+      (v2vMsgs : genMsgs(ff,n,none))
+      (blockActSnd : v(3))
+      ] .
+
+ op asysint : Rat Nat -> ASystemIntruder .
+ eq asysint(ff, n) 
+  = {simple-scenario ; intruder(ff,n)} .
+
+ op bad-state : ASystemIntruder -> Bool .
+ op bad-state$ : Agent -> Bool .
+
+ ceq bad-state({ {conf agent} ; int})
+ = true 
+ if bad-state$(agent) .
+ eq bad-state$([id0 : cl |
+     (lkb : ((gapNext(id0, ff) @ t0)
+           (speed(id0,ff1) @ t1)
+           gapSafety(id0,ffL,ffH) kb)), 
+     attrs ]) = ff < ffL * ff1 .
+ 
+ op bad-state2 : Rat ASystemIntruder -> Bool .
+ op bad-state2$ : Rat Agent -> Bool .
+ ceq bad-state2(ff1,{ {conf agent} ; int})
+  = true 
+  if bad-state2$(ff1,agent) .
+ eq bad-state2$(ff1,[id0 : cl |
+  (lkb : ((gapNext(id0, ff) @ t0) kb)), 
+  attrs ]) = ff < ff1 .
+
+ op crash : ASystemIntruder -> Bool .
+ op crash$ : Env -> Bool .
+ ceq crash({ {conf env} ; int})
+  = true 
+  if crash$(env) .
+
+  eq crash$([id0 |
+   (atloc(v(1), loc(ff1)) @ t1)
+   (atloc(v(0), loc(ff0)) @ t0) 
+    kb]) = ff1 >= ff0 .
+
+ op asys2 : -> ASystemIntruder .
+
+endm
+
+eof
+
+*** with plausibility check enabled ***
+search [1] in TEST-INTRUDER : asysint(70, 0) =>* iasys such that crash(iasys) = true .
+

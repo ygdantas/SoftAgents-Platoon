@@ -1,0 +1,506 @@
+fmod MODEL-KNOWLEDGE is
+  inc SOFT-AGENTS .
+	inc CONVERSION .
+	inc RANDOM .
+  inc RAT .
+
+  vars t t0 t1 t2 t3 t4 t5 t6 : Time .
+  var n i j j0 j1 n0 n1 e e0 e1 e2 inc nl len len1 : Nat .
+  vars x y x1 y1 x0 y0 xll xur yll yur i0 i1 : Int .
+  vars id id0 id1 id2 id3 : Id .
+	var cl : Class .
+  vars l l0 l1 l2 l3 loc : Loc .
+  vars ekb ekb0 ekb1 kb  lkb kb1 lkb0 kb0 kb2 :  KB .
+  vars  ff ff0 ff1 fp0 fp1 rp0 rp1 ff2 ff3 spd spd1 devSpd thldSpd spdNext spdVehNext spdIdNext r sum sum1 avg avgL lenL acc : Rat .
+	vars act act0 act1 : Action .
+  vars md md1 : Mode .
+  vars ids ids0 : IdSet .
+  vars cnt cnt1 : Content .
+  var aconf : Conf .
+  var mg : Msg .
+  vars idL idL0 IdList : IdList .
+  vars trat trat0 trat1 : TimedRat .
+  vars nutrats trats : TimedRatList .
+  var nuGap : Rat .
+  var idNxt : Id .
+  var agent : Agent .
+
+**** Measure charge in % full
+**** Max is thus 100
+
+**** scenario parameters
+ op tickDelay : -> Nat .
+ --- dist to last to be considered joined
+ op joinThresh : -> Rat . 
+
+**** Model specific classes
+   sort VClass .
+   subsort VClass < Class .
+   ops veh infra : -> VClass [ctor] .
+*** roles
+  sort Mode .
+  
+  *** leading(none) denotes that the vehicle
+  *** is leading and no vehicle wants to join the platoon.
+  *** leading(id) denotes that the vehicle
+  *** is leading and vehicle id wants to join the platoon.
+  *** These are the only cases.
+  op leading : IdSet -> Mode .
+  op fuseStartRear : Id Id -> Mode .
+  op fuseRear : Id Id Rat Loc -> Mode .
+  op following : Id -> Mode .
+  ops nonplatoon
+      fuseOutStart 
+      fuseOut emergency 
+      split : -> Mode .
+
+  *** In off mode, the second parameter is not important.
+  op mode : Id Mode -> Info .
+  *** platoon spec
+  op platoon : Id IdList -> Info .
+  op leader : Id -> Info .
+  op loc : Rat -> Loc .
+
+  op ldist : Loc Loc -> Rat .
+  eq ldist(loc(ff0),loc(ff1)) = abs(ff0 - ff1) .
+
+
+  op sum : Loc Loc -> Loc .
+  eq sum(loc(fp0), loc(fp1)) = loc(fp0 + fp1) .
+  
+*** Protocol States
+op st : Id String PAttrs -> Info .
+
+sort PAttr PAttrs .
+subsort PAttr < PAttrs .
+op none : -> PAttrs [ctor] .
+op __ : PAttrs PAttrs -> PAttrs [ctor assoc comm id: none] .
+
+*** Infrastructure Knowledge 
+
+op sensedVeh : Id Id Rat -> Info .
+*** InfraId VehId Loc Tol Content
+op i2vTrigger : Id Id Rat Rat Content -> Info .
+
+*** Protocol Messages
+sort Msg . 
+sorts ProtName Content .
+**** from to (protocol name) content .
+op msg : Id Id String Content -> Msg . 
+op msg : Id Id Content -> Msg .
+op hbl2f : Id Rat Loc KB -> Content .
+op hbf2l : Id Rat Loc -> Content .
+op hbl2j : Id Id Rat Loc -> Content .
+op hbj2l : Id Id Rat Loc -> Content .
+op joined : Id Id Rat Loc -> Content .
+op i2vmsg : Id Id Content -> Msg . 
+op d : Rat -> Content [ctor] .
+sort TMsg .
+op _@_ : Msg Nat -> TMsg .
+
+op getRecId : TMsg -> Id .
+op getRecId : Msg -> Id .
+eq getRecId(mg @ t) = getRecId(mg) .
+eq getRecId(msg(id,id1,s:String,cnt)) = id1 . 
+eq getRecId(msg(id,id1,cnt)) = id1 . 
+eq getRecId(i2vmsg(id,id1,cnt)) = id1 . 
+
+**** I2V Content
+op nuPlatoon : -> Content .
+op join : Id -> Content .
+op i2vEmergency : Id -> Content .
+
+**** Found Suitable Protocol 
+ops canJoin KO emergency : -> Content .
+op OK : Id Rat Loc -> Content .
+op snd`:_ : Id -> PAttr .
+op rec`:_ : Id -> PAttr .
+op name`:_ : String -> PAttr .
+
+*** Maximum accelaration
+  op maxAcc : Id Rat -> PKItem .
+  op gapGreen : Id Nat Nat -> PKItem .
+  op gapSafety : Id Nat Nat -> PKItem .
+
+**** max communication distance
+	op comDist : Nat -> PKItem [ctor] .
+  op getComDist : KB -> Nat .
+  eq getComDist(comDist(n) kb) = n .
+  eq getComDist(kb) = 0 [owise] .
+
+  op getComDistKI :  KB -> KB .
+  eq getComDistKI(comDist(n) kb) = comDist(n) .
+  eq getComDistKI(kb) = none [owise] .
+
+*** Comm sharing
+  *** v2all(true) denotes that all vehicles in the platoon
+  *** can share data among each other. 
+  *** v2all(false) denotes that only vehicle to leader comm
+  *** is allowed.
+***(
+  op v2all : Bool -> PKItem .
+  op v2v : Bool -> PKItem .
+  op i2v : Bool -> PKItem .
+)
+
+**** for modeling faults 
+  op randInc : Nat -> KItem .
+  op rand : Id Nat Nat -> Info .
+
+**** abstracting random numbers to [0,1]
+  ops randMax rand.25 rand.5 rand.75 rand.125 : -> Nat .
+  eq randMax = 4294967295 .
+	eq rand.25 = 1073741824 .
+	eq rand.5  = 2147483647 .
+	eq rand.75 = 3221225471 .
+  eq rand.125 = 536870912 .
+
+*** partial order
+****  eq (clock(t0)) << (clock(t1)) = t0 < t1 .
+  eq (mode(id,md) @ t0) << (mode(id,md1) @ t1) = t0 < t1 .
+  eq (rand(id,n0,j0) @ t0) << (rand(id,n1,j1) @ t1) 
+     = t0 < t1 .
+
+  eq (platoon(id,idL) @ t0) << (platoon(id,idL0) @ t1) 
+     = t0 < t1 .
+
+*** plausibilty knowledge facts
+sorts TimedRat TimedRatList .
+subsort TimedRat < TimedRatList .
+op _@_ : Rat Nat -> TimedRat .
+*** Used to initialize the history of measurements
+*** when for example a vehicle joins a platoon.
+op noVal : -> TimedRat .
+op nil : -> TimedRatList .
+op _;_ : TimedRatList TimedRatList -> TimedRatList [assoc id: nil] .
+
+*********************************************************************
+op getSpeedTimedList : TimedRat -> Rat .
+eq getSpeedTimedList((r @ n)) = r .
+
+*** op logSpdPlCkFail : Id LoggedList Nat -> LoggedList .
+op logSpdPlCkFail : Id Id Nat -> Info .
+
+*** sum all natural values (e.g., speed) in a TimedRatList (e.g, histSpd)
+op sumTimedList : TimedRatList Rat -> Rat .
+eq sumTimedList(trat0 ; trats, sum) =
+  if (trat0 =/= noVal) then
+   sumTimedList(trats, sum + getSpeedTimedList(trat0) ) 
+  else
+   sumTimedList(trats, sum )
+  fi  .
+
+eq sumTimedList(nil, sum) = sum . 
+
+*** length of TimedRatList
+op lenTimedList : TimedRatList Rat -> Rat .
+
+eq lenTimedList(trat0 ; trats, lenL) 
+= if (trat0 =/= noVal) then
+    lenTimedList(trats, (lenL + 1))
+  else
+    lenTimedList(trats, lenL)
+   fi .  
+
+
+eq lenTimedList(nil, lenL) = lenL . 
+
+*** average of all natural values (e.g., speed) in a TimedRatList (e.g, histSpd)
+op avgTimedList : TimedRatList -> Rat .
+ceq avgTimedList(trats) = 
+  if (len > 0) then
+      (sum / len)
+  else 
+      0
+  fi        
+ if sum := sumTimedList(trats, 0)
+ /\ len := lenTimedList(trats, 0) .
+eq avgTimedList(trats) = 0 [owise] .
+
+*** get id of the next vehicle (i.e., vehicle in front)
+op getIdNext : Id IdList -> Id .
+eq getIdNext(id, id0 id ; idL) = id0 . 
+
+op getTratsHist : Id Id TimedRatList -> TimedRatList .
+eq getTratsHist(id,idNxt,trats) = trats .
+
+***(
+TODO: This op needs to be integrated to knowledge file in Lib/
+)
+op stopSearch : Conf -> Bool .
+eq stopSearch ( aconf ) = false [owise] .
+ceq stopSearch (agent aconf) = true 
+if  (logSpdPlCkFail(id, idNxt, inc) @ t3) kb1 := getLKB(agent) 
+/\  (inc > 0) .
+
+***if  (platoon(idL, id1 ; id2) @ t3) kb1 := getLKB(agent) .
+  
+
+
+
+*** Plausibility check: Speed Error Threshold
+**** A vehicle checks whether a speed value exceeds a certain threshold (in %); A log entry is created whenever the speed value exceeds the thread
+op spdErrThld : Id KB Rat -> KB . 
+ceq spdErrThld(id, kb, thldSpd)
+= if ( (spdIdNext > (avgL + (avgL * thldSpd))) and (trat0 =/= noVal)) or ((spdIdNext < (avgL - avgL * thldSpd)) and (trat0 =/= noVal) ) then
+ clock(t1) (idNext(id, idNxt) @ t2) (logSpdPlCkFail(id, idNxt, (inc + 1)) @ t1) (histSpd(id, idNxt, trat0 ; trats) @ t4) kb1
+ else
+   kb
+ fi  
+ if clock(t1) (idNext(id, idNxt) @ t2) (logSpdPlCkFail(id, idNxt, inc) @ t3) (histSpd(id, idNxt, trat0 ; trats) @ t4) kb1 := kb 
+ /\ avgL := avgTimedList(trat0 ; trats)
+ /\ spdIdNext := getSpeed(idNxt,kb) .
+
+
+*** this is for debugging only
+ eq spdErrThld(id, kb, thldSpd) = kb [owise] .
+
+op getSpeed : Id KB -> Rat .
+eq getSpeed(id, (speed(id,ff) @ t0) kb) 
+   = ff .
+ 
+
+***  op leading : IdSet -> Mode .
+***  op fuseStartRear : Id Id -> Mode .
+***  op fuseRear : Id Id Rat Loc -> Mode .
+***  op following : Id -> Mode .
+*** var modVeh : Mode .
+op emergPlsCk : Id KB -> Bool .
+ceq emergPlsCk(id, kb) = true
+ if (mode(id1, emergency) @ t1) (mode(id, following(id1)) @ t2) kb1 := kb .  
+
+
+eq emergPlsCk(id, kb) = false [owise] .  
+
+
+
+*********************************************************************
+
+op upHist : Id KB -> KB .
+ceq upHist(id,kb) = kb2 
+ if kb0 (platoon(id1,idL) @ t0) := kb 
+ /\ kb1 := upHistGap(id,kb) 
+ *** we need to include the leader vehicle in the list.
+ /\ kb2 := upHistSpd(id,id1 ; idL,kb1) .
+
+*** this is for debugging only
+eq upHist(id,kb) = kb [owise] .
+
+*** This info stores the last 
+*** gaps sensed by the car to the next car.
+op histGap : Id TimedRatList -> Info .
+
+*** This info stores the last 
+*** informed speeds of a vehicle.
+op histSpd : Id Id TimedRatList -> Info .
+
+op remLast : TimedRatList -> TimedRatList .
+eq remLast(trats ; trat) = trats .
+
+op upHistGap : Id KB -> KB .
+ceq upHistGap(id,kb
+    (gapNext(id,nuGap) @ t)
+    (histGap(id,trat0 ; trats) @ t2))
+ = kb (gapNext(id,nuGap) @ t)
+   (histGap(id,nutrats) @ t)
+ if not ((nuGap @ t) == trat0) 
+ /\ nutrats := (nuGap @ t) 
+               ; remLast(trat0 ; trats) .
+
+eq upHistGap(id,kb) = kb [owise] .
+
+*** TBD
+op upHistSpd : Id IdList KB -> KB .
+
+ceq upHistSpd(id,id1 ; idL,kb)
+ = upHistSpd(id,idL,kb1)
+ if kb0 (speed(id1,spd) @ t) 
+   (histSpd(id,id1,trat0 ; trats) @ t1) := kb 
+ /\ not (id == id1)  
+ /\ not ((spd @ t) == trat0)
+ /\ nutrats := (spd @ t) 
+               ; remLast(trat0 ; trats) 
+ /\ kb1 := kb0 (speed(id1,spd) @ t)
+   (histSpd(id,id1,nutrats) @ t) .
+
+eq upHistSpd(id,id ; idL,kb) = upHistSpd(id,idL,kb) .
+
+ eq upHistSpd(id,nil,kb) = kb .
+
+ eq upHistSpd(id,idL,kb) = kb [owise] .
+
+
+
+*** Sensor Types --- locS defined in Lib/knowledge
+ops  speedS gapS vehS : -> Sensor .
+
+*** sensor info
+
+  op speed : Id Rat -> Info .
+  op gapNext : Id Rat -> Info .
+
+  op accel : Id Rat -> Info .  --- desired speed - current speed
+  op commDelay : Id Rat -> Info .
+  op net : TMsg -> Info .  --- removal managed directly
+  op netI : TMsg -> Info .  --- removal managed directly
+  eq (speed(id,ff) @ t0) 
+         << (speed(id,ff1) @ t1) = t0 < t1 .
+  eq (accel(id,ff) @ t0) 
+         << (accel(id,ff1) @ t1) = t0 < t1 .
+  eq (gapNext(id,ff) @ t0) 
+         << (gapNext(id,ff1) @ t1) = t0 < t1 .
+  eq (commDelay(id,ff) @ t0) 
+         << (commDelay(id,ff1) @ t1) = t0 < t1 .
+  eq sensedVeh(id,id1,ff) @ t0 << 
+         sensedVeh(id,id2,ff1) @ t1 = t0 < t1 .
+  eq i2vTrigger(id,id2,ff,ff1,cnt) @ t0 <<
+         i2vTrigger(id,id2,ff2,ff3,cnt1) @ t1 = t0 < t1 . 
+
+  *** These are used to set the mode of vehicles. 
+  *** E.g., mmsg(id,mode(id,leading(none)) specifies that the mode shall change to leading(none)
+  op mmsg : Id Info -> Info .
+
+  op idNext : Id Id -> Info .
+  eq (idNext(id,id1) @ t0) 
+        << (idNext(id,id1) @ t1) = t0 < t1 .
+    
+  op cybdelay : Rat -> PKItem .
+  op physdelay : Rat -> PKItem .
+
+  op lastComms : Id ActSet -> Info .
+
+
+  *** TASKS
+
+  op v2v : Id TMsg -> Task [ctor] .
+
+
+endfm	
+
+******** bot  actions
+fmod MODEL-ACTIONS is 
+  inc MODEL-KNOWLEDGE .  
+
+  vars t t0 t1 t2 t3 t4 t5 t6 : Time .
+  var n i j j0 j1 n0 n1 e e0 e1 e2 : Nat .
+	var cl : Class .
+  vars ekb ekb0 ekb1 kb  lkb kb1 lkb0 kb0 kb2 :  KB .
+  vars  ff ff0 ff1 ff2 fp0 fp1 rp0 rp1 spd acc : Rat .
+	vars act act0 act1 : Action .
+  var md : Mode .
+  var actsFuseStart : ActSet .
+  var idList : IdList .
+  vars id id1 id2 id3 id0 : Id .
+
+*** Added for simple sim.  should have two Rats
+  op actAcc : Id Rat -> Action [ctor] .
+  op actSpeed : Id Rat Rat -> Action [ctor] .
+  --- op actGap : Id -> Action [ctor] .
+  *** Send actions for the v2v communication
+  op actSnd : Id TMsg -> Action [ctor] .  
+  *** Send actions for the infrastructure
+  op actSndI : Id TMsg -> Action [ctor] .  
+  op actBCast : Id KB -> Action [ctor] . 
+  op actId : Action ~> Id .
+  eq actId(actSpeed(id,ff1,ff2)) = id .
+  eq actId(actSnd(id,tmsg:TMsg)) = id .
+  eq actId(actSndI(id,tmsg:TMsg)) = id .
+  eq actId(actBCast(id,kb)) = id .
+ 
+********* helpers
+
+op getPlatoon : Id KB -> IdList .
+eq getPlatoon(id, (platoon(id,idList) @ t0) kb) 
+   = idList .
+
+  op getMode : KB -> Mode .
+  eq getMode((mode(id,md) @ t) kb) = md .
+  op getMaxAcc : Id KB -> Rat .
+  eq getMaxAcc(id,(maxAcc(id,ff)) kb) 
+    = ff .
+  op monus : Rat Rat -> Rat .
+  eq monus(ff,ff1) = if ff1 >= ff then 0
+                     else ff - ff1 fi .
+
+  op mkSpeedAct : Id KB -> Action .  
+  ceq mkSpeedAct(id,lkb) 
+   = actSpeed(id,monus(spd,acc),spd + acc) 
+   if spd := getSpeed(id,lkb)
+   /\ acc := getMaxAcc(id,lkb) .
+
+**** Implement the mode automaton.
+ op myActs : Class Id KB -> ActSet .
+ 
+ *** non-platooning mode. 
+ eq myActs(cl,id,lkb) 
+  = mkSpeedAct(id,lkb) .
+
+*** agents model of action = maude physics when no interference
+*** returns the kb update
+
+*** actSpeed(id,ff1,ff2)
+*** actMode(id,md)  .
+op doAct :  Action KB -> KB .
+
+*** Probably need to compute the gapNext
+eq doAct(actSpeed(id,ff1,ff2),
+        (clock(t)) 
+        (speed(id,ff) @ t1) kb) 
+ = if ff1 == ff2 then 
+    (speed(id,ff1) @ s t)
+   else 
+    (speed(id,ff1) @ s t) fi .
+
+eq doAct(a:Action,kb) = none [owise] .
+  
+endfm
+
+fmod FAULT-MODEL is
+  inc MODEL-KNOWLEDGE .
+  
+  ***(
+  physical knowledge
+   class(id,cl)
+   atloc(id,loc) @ t
+   speed(id,sp) @ t
+   accel(id,ac) @ t
+
+  sensor names 
+    locS
+    gapS
+    speedS 
+    vehS
+
+  Actions
+   actSpeed(id,vmin,vmax)
+   *** actAcc
+
+  ) 
+
+  **** Fault/Failure model  
+
+  sort FVal .
+  op ffV : Rat -> FVal .
+  op sffV : Int Rat -> FVal .
+  op intV : Int -> FVal .
+
+  vars  ff ff0 ff1  : Rat .
+  vars i0 i1 : Int .
+
+  op sum : FVal FVal -> FVal .
+  op mult : Int FVal -> FVal .
+
+  eq sum(ffV(ff0), ffV(ff1)) = ffV(ff0 + ff1) .
+  eq sum(intV(i0), intV(i1)) = intV(i0 + i1) .
+
+  sorts FType FPars .
+  op simpleFT : -> FType [ctor] .
+  op sFP : Rat Rat FVal -> FPars [ctor] .
+  ****      prob scale   prob shift  (scale shift) 
+
+  op boolFT : -> FType [ctor] .
+  op bFP : Rat -> FPars [ctor] .  *** prob of fail
+  
+
+endfm
+

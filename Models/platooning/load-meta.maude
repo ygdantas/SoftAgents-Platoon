@@ -1,0 +1,42 @@
+load load-sim
+
+load model-checker 
+load ../../../../imaude/ilib/load-lib
+load ../../Lib/meta-sa 
+loop init .
+
+
+**** testing with just maude
+***(seq
+**** simname == unKnown => MaudePhysics
+**** maudename g2dname g2dvname simname amodname initname wid randinc 
+(initAgentEset maude g2d g2d unKnown SCENARIO-SIM scenario-simple unKnown  300) 
+)
+
+
+(seq
+
+(loadg2dlib g2d ../../../../imaude/jlib/jl-util.lsp)
+(loadg2dlib g2d ../../Lib/Lsp/pseudosim.lsp)
+**** init veh/world
+(g2dexe g2d (let ((v0 (apply initVeh "v(0)" (double 1000) (double 25))) (v1 (apply initVeh "v(1)" (double 945) (double 20))) ) (setUID v0 "v(0)") (setUID v1 "v(1)") (apply initWorld "w0" (apply mkPair v0 v1)) ))
+**** simname == unKnown => MaudePhysics
+**** maudename g2dname g2dvname simname amodname initname wid randinc 
+(initAgentEset maude g2d g2d g2d SCENARIO-SIM scenario-simple w0 300) 
+)
+
+****(g2dexe g2d (load (sinvoke "g2d.util.IO" "interpretTilde" "~/Repositories/imaude/jlib/jl-util.lsp")))
+
+**** (loadg2dlib g2d ../../Lib/stats-funs.lsp)
+***(
+(doround 1)
+state:  (accel(v(1), 88/100) @ 1) (atloc(v(1), loc(96544/100)) @ 1) (speed(v(1), 2088/100) @ 1) (accel(v(0), 0/100) @ 1) (atloc(v(0), loc(102500/100)) @ 1) (speed(v(0), 2500/100) @ 1) 
+sensor:  (accel(v(1), 88/100) @ 1) (atloc(v(1), loc(96544/100)) @ 1) (speed(v(1), 2088/100) @ 1) (gapNext(v(1), 5956/100) @ 1) (accel(v(0), 0/100) @ 1) (atloc(v(0), loc(102500/100)) @ 1) (speed(v(0), 2500/100) @ 1)  
+
+(doRoundAux 2)
+state:  (accel(v(1), 112/100) @ 2) (atloc(v(1), loc(98687/100)) @ 2) (speed(v(1), 2199/100) @ 2) (accel(v(0), 0/100) @ 2) (atloc(v(0), loc(105000/100)) @ 2) (speed(v(0), 2500/100) @ 2) 
+sensor:  (accel(v(1), 112/100) @ 2) (atloc(v(1), loc(98687/100)) @ 2) (speed(v(1), 2199/100) @ 2) (gapNext(v(1), 6313/100) @ 2) (accel(v(0), 0/100) @ 2) (atloc(v(0), loc(105000/100)) @ 2) (speed(v(0), 2500/100) @ 2)  
+OK
+state:  (accel(v(1), 115/100) @ 3) (atloc(v(1), loc(100943/100)) @ 3) (speed(v(1), 2314/100) @ 3) (accel(v(0), 0/100) @ 3) (atloc(v(0), loc(107500/100)) @ 3) (speed(v(0), 2500/100) @ 3) 
+sensor:  (accel(v(1), 115/100) @ 3) (atloc(v(1), loc(100943/100)) @ 3) (speed(v(1), 2314/100) @ 3) (gapNext(v(1), 6557/100) @ 3) (accel(v(0), 0/100) @ 3) (atloc(v(0), loc(107500/100)) @ 3) (speed(v(0), 2500/100) @ 3)  
+)

@@ -1,0 +1,10 @@
+load ../../Lib/load-sa
+
+load knowledge
+load sensor-faults
+
+load scp
+load tasks
+load actions
+load scenario-sim
+

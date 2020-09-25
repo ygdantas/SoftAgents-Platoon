@@ -1,0 +1,309 @@
+load test-plausibility .
+*** load intruderList .
+
+mod TEST-INTRUDER-SLOW-INJECTION is
+  inc TEST-SIMPLE-FOLLOWING-SLOW .
+  inc INTRUDER-MODEL-LIST .
+
+ var n : Nat .
+ var msgs : MsgsL .
+ var intr : Intruder .
+ var conf : Conf .
+ var attrs : AttributeSet .
+ vars kb kb0 : KB .
+ vars t0 t1 t2 t3 cnt : Nat .
+ vars ff ff0 ff1 ffL ffH : Rat .
+ var int : Intruder .
+ vars asys scario : ASystem .
+ var iasys : ASystemIntruder .
+ vars agent agent1 agent2 agent3 : Agent .
+ var cl : Class .
+ var id0 : Id .
+ var env : Env .
+ var inf : Agent .
+ var evs : EventSet .
+
+ op imsgs : -> MsgsL .
+
+ op genMsgs : Rat Nat MsgsL -> MsgsL .
+ eq genMsgs(ff,s n,msgs) 
+  = genMsgs(ff,n, msg(v(0),v(1), 
+    hbl2f(v(0),ff + (s n) * 3, loc(1000 + 3 * (s n)),none)) ; msgs) .
+ eq genMsgs(ff,0,msgs) = msgs .
+
+ op iid : -> Id .
+ op intruder : Rat Nat -> Intruder .
+ eq intruder(ff,n) 
+   = [iid : intruder |
+      (v2vMsgsL : genMsgs(ff,n,nil))
+      (blockActSnd : v(0) ; 0 )
+      ] .
+
+ op asysint : Rat Nat -> ASystemIntruder .
+ eq asysint(ff, n) 
+  = {simple-scenario ; intruder(ff,n)} .
+
+
+ op crash : ASystemIntruder -> Bool .
+ op crash$ : Env -> Bool .
+ ceq crash({ {conf env} ; int})
+  = true 
+  if crash$(env) .
+
+  eq crash$([id0 |
+   (atloc(v(1), loc(ff1)) @ t1)
+   (atloc(v(0), loc(ff0)) @ t0)  
+    kb]) = ff1 >= ff0 .
+
+ op asys2 : -> ASystemIntruder .
+
+
+op getAgtFromConf : ASystemIntruder -> Agent .
+eq getAgtFromConf({ { agent1 agent2 conf env } ; int }) = agent2 .
+
+op noLogs : ASystemIntruder -> Bool .
+op noLogs$ : Agent -> Bool .
+ 
+ceq noLogs({ scario ; int})
+ = true 
+ if noLogs$(getAgtFromConf({ scario ; int})) .
+
+ceq noLogs$( [v(1) : cl | 
+            lkb : kb0,
+            ckb : none,
+            sensors : (locS speedS gapS), 
+            evs : evs ] 
+             )
+= if ( (cnt == 0) )  then
+    true
+  else
+    false
+  fi 
+if (logSpdPlCkFail(v(1), v(0), cnt) @ t1) kb := kb0 .
+
+
+endm
+
+eof
+
+search [1] in TEST-INTRUDER-SLOW-INJECTION : asysint(30, 16) =>* iasys such that crash(iasys) and noLogs(iasys) .
+
+*** with # blocked messaged enabled and with countermeasure ***
+Solution 1 (state 3286680)
+states: 3286681  rewrites: 1594284868 in 3195104ms cpu (3195301ms real) (498977 rewrites/second)
+iasys --> {{
+[eId |
+  clock(8) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1160)) @ 8) (atloc(v(1), loc(1160)) @ 8) (speed(v(0), 20) @ 8) (speed(v(1), 24) @ 8) (accel(v(0), 0) @ 8) accel(v(1), 0) @
+    8] 
+[v(0) : veh |
+  lkb : (clock(8) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 7) (atloc(v(0), loc(1140)) @ 7) (atloc(v(1), loc(1104)) @ 6) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0),
+    20) @ 7) (speed(v(1), 29) @ 6) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 27, loc(1133))) @ 7) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(8) class(v(1), veh) (lastAct(actSpeed(v(1), 24, 76/3)) @ 7) (atloc(v(0), loc(1039)) @ 2) (atloc(v(1), loc(1133)) @ 7) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(
+    0), 69) @ 2) (speed(v(1), 27) @ 7) (gapNext(v(1), 7) @ 7) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (69 @ 2) ; (63 @ 1) ; 66 @ 1) @ 2) maxAcc(v(1), 3)
+    gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(8) (atloc(v(0), loc(1140)) @ 7) atloc(v(1), loc(1133)) @ 7),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : (msg(v(0), v(1), hbl2f(v(0), 72, loc(1042), none)) ; msg(v(0), v(1), hbl2f(v(0), 75, loc(1045), none)) ; msg(v(0), v(1), hbl2f(v(0), 78, loc(1048), none)))
+  blockActSnd : v(0) ; 8]}
+
+*** with # blocked messaged enabled and without countermeasure ***
+Solution 1 (state 3315283)
+states: 3315284  rewrites: 1587284697 in 3165888ms cpu (3165963ms real) (501371 rewrites/second)
+iasys --> {{
+[eId |
+  clock(8) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1160)) @ 8) (atloc(v(1), loc(1160)) @ 8) (speed(v(0), 20) @ 8) (speed(v(1), 24) @ 8) (accel(v(0), 0) @ 8) accel(v(1), 0) @
+    8] 
+[v(0) : veh |
+  lkb : (clock(8) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 7) (atloc(v(0), loc(1140)) @ 7) (atloc(v(1), loc(1104)) @ 6) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0),
+    20) @ 7) (speed(v(1), 29) @ 6) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 27, loc(1133))) @ 7) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(8) class(v(1), veh) (lastAct(actSpeed(v(1), 24, 76/3)) @ 7) (atloc(v(0), loc(1039)) @ 1) (atloc(v(1), loc(1133)) @ 7) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(
+    0), 69) @ 1) (speed(v(1), 27) @ 7) (gapNext(v(1), 7) @ 7) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (69 @ 1) ; (33 @ 0) ; 36 @ 0) @ 1) maxAcc(v(1), 3)
+    gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(8) (atloc(v(0), loc(1140)) @ 7) atloc(v(1), loc(1133)) @ 7),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : (msg(v(0), v(1), hbl2f(v(0), 72, loc(1042), none)) ; msg(v(0), v(1), hbl2f(v(0), 75, loc(1045), none)) ; msg(v(0), v(1), hbl2f(v(0), 78, loc(1048), none)))
+  blockActSnd : v(0) ; 8]}
+
+
+
+search [1] in TEST-INTRUDER-SLOW-INJECTION : asysint(70, 1) =>* iasys such that crash(iasys) = true .
+
+Solution 1 (state 88693)
+states: 88694  rewrites: 75567056 in 92912ms cpu (92916ms real) (813318 rewrites/second)
+iasys --> {{
+[eId |
+  clock(10) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1200)) @ 10) (atloc(v(1), loc(1201)) @ 10) (speed(v(0), 20) @ 10) (speed(v(1), 20) @ 10) (accel(v(0), 0) @ 10) accel(v(
+    1), 0) @ 10] 
+[v(0) : veh |
+  lkb : (clock(10) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 9) (atloc(v(0), loc(1180)) @ 9) (atloc(v(1), loc(1152)) @ 8) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0),
+    20) @ 9) (speed(v(1), 26) @ 8) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 23, loc(1178))) @ 9) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(10) class(v(1), veh) (lastAct(actSpeed(v(1), 20, 20)) @ 9) (atloc(v(0), loc(1160)) @ 8) (atloc(v(1), loc(1178)) @ 9) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(
+    0), 20) @ 8) (speed(v(1), 23) @ 9) (gapNext(v(1), 2) @ 9) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 8) @ 9) (histSpd(v(1), v(0), (20 @ 8) ; (20 @ 7) ; 20 @ 6) @ 8) maxAcc(v(1), 3)
+    gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(1), msg(v(0), v(1), hbl2f(v(0), 20, loc(1180), (atloc(v(1), loc(1152)) @ 8) (platoon(v(0), v(1)) @ 0) speed(v(1), 26) @ 8)) @ 9) @ 0)] 
+[i(0) : infra |
+  lkb : (clock(10) (atloc(v(0), loc(1180)) @ 9) atloc(v(1), loc(1178)) @ 9),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : none
+  blockActSnd : v(0)]}
+
+
+search [1] in TEST-INTRUDER-SLOW-INJECTION : asysint(20, 50) =>* iasys such that crash(iasys) = true .
+
+search [1] in TEST-INTRUDER-SLOW-INJECTION : asysint(30, 16) =>* iasys such that crash(iasys) = true .
+
+Solution 1 (state 3427877)
+states: 3427878  rewrites: 1640105431 in 4622332ms cpu (4635082ms real) (354822 rewrites/second)
+iasys --> {{
+[eId |
+  clock(8) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1160)) @ 8) (atloc(v(1), loc(1160)) @ 8) (speed(v(0), 20) @ 8) (speed(v(1), 24) @ 8) (accel(v(0), 0) @ 8) accel(v(1), 0) @ 8] 
+[v(0) : veh |
+  lkb : (clock(8) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 7) (atloc(v(0), loc(1140)) @ 7) (atloc(v(1), loc(1104)) @ 6) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0), 20) @ 7) (speed(v(1), 29) @ 6) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 27, loc(1133))) @ 7) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(8) class(v(1), veh) (lastAct(actSpeed(v(1), 24, 76/3)) @ 7) (atloc(v(0), loc(1039)) @ 1) (atloc(v(1), loc(1133)) @ 7) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0), 69) @ 1) (speed(v(1), 27) @ 7) (gapNext(v(1), 7) @ 7) (idNext(v(1), v(0)) @
+    0) (logSpdPlCkFail(v(1), v(0), 6) @ 7) (histSpd(v(1), v(0), (69 @ 1) ; (33 @ 0) ; 36 @ 0) @ 1) maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(8) (atloc(v(0), loc(1140)) @ 7) atloc(v(1), loc(1133)) @ 7),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : (msg(v(0), v(1), hbl2f(v(0), 72, loc(1042), none)) ; msg(v(0), v(1), hbl2f(v(0), 75, loc(1045), none)) ; msg(v(0), v(1), hbl2f(v(0), 78, loc(1048), none)))
+
+
+search [1] in TEST-INTRUDER-SLOW-INJECTION : asysint(30, 16) =>* iasys such that crash(iasys) and noLogs(iasys) .
+
+Solution 1 (state 3286680)
+states: 3286681  rewrites: 1593123658 in 3426804ms cpu (3434244ms real) (464900 rewrites/second)
+iasys --> {{
+[eId |
+  clock(8) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1160)) @ 8) (atloc(v(1), loc(1160)) @ 8) (speed(v(0), 20) @ 8) (speed(v(1), 24) @ 8) (accel(v(0), 0) @ 8) accel(v(1), 0) @
+    8] 
+[v(0) : veh |
+  lkb : (clock(8) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 7) (atloc(v(0), loc(1140)) @ 7) (atloc(v(1), loc(1104)) @ 6) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0),
+    20) @ 7) (speed(v(1), 29) @ 6) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 27, loc(1133))) @ 7) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(8) class(v(1), veh) (lastAct(actSpeed(v(1), 24, 76/3)) @ 7) (atloc(v(0), loc(1039)) @ 2) (atloc(v(1), loc(1133)) @ 7) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(
+    0), 69) @ 2) (speed(v(1), 27) @ 7) (gapNext(v(1), 7) @ 7) (idNext(v(1), v(0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (69 @ 2) ; (63 @ 1) ; 66 @ 1) @ 2) maxAcc(v(1), 3)
+    gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(8) (atloc(v(0), loc(1140)) @ 7) atloc(v(1), loc(1133)) @ 7),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : (msg(v(0), v(1), hbl2f(v(0), 72, loc(1042), none)) ; msg(v(0), v(1), hbl2f(v(0), 75, loc(1045), none)) ; msg(v(0), v(1), hbl2f(v(0), 78, loc(1048), none)))
+  blockActSnd : v(0)]}
+
+
+--------------------------------------------
+*** srew
+--------------------------------------------
+
+
+
+srew in TEST-INTRUDER-SLOW-INJECTION : asysint(30, 16) using injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ;  injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep .
+srewrite in TEST-INTRUDER-SLOW-INJECTION : asysint(30, 16) using injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ;
+    timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ;
+    doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ;
+    doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep ; injectMessage ; doTasks ; doTasks ; doTasks ; timeStep .
+
+Solution 1
+rewrites: 175526 in 200ms cpu (200ms real) (877630 rewrites/second)
+result ASystemIntruder: {{
+[eId |
+  clock(16) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1320)) @ 16) (atloc(v(1), loc(1322)) @ 16) (speed(v(0), 20) @ 16) (speed(v(1), 23) @ 16) (accel(v(0), 0) @ 16) accel(v(1), 0) @ 16] 
+[v(0) : veh |
+  lkb : (clock(16) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 15) (atloc(v(0), loc(1300)) @ 15) (atloc(v(1), loc(1276)) @ 14) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0), 20) @ 15) (speed(v(1), 23) @ 14) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 23, loc(1299))) @ 15) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(16) class(v(1), veh) (lastAct(actSpeed(v(1), 20, 26)) @ 15) (atloc(v(0), loc(1048)) @ 15) (atloc(v(1), loc(1299)) @ 15) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0), 78) @ 15) (speed(v(1), 23) @ 15) (gapNext(v(1), 1) @ 15) (idNext(v(1), v(
+    0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (78 @ 15) ; (75 @ 14) ; 72 @ 13) @ 15) maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(16) (atloc(v(0), loc(1300)) @ 15) atloc(v(1), loc(1299)) @ 15),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : nil
+  blockActSnd : v(0)]}
+
+**** after modified version of crl [doTasks]
+srew in TEST-INTRUDER-SLOW-INJECTION : asysint(30, 16) using injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep  ; injectMessage ; doTasks ; timeStep  ; injectMessage ; doTasks ; timeStep  ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep ; injectMessage ; doTasks ; timeStep   .
+
+
+Solution 1
+rewrites: 29234 in 48ms cpu (48ms real) (609041 rewrites/second)
+result ASystemIntruder: {{
+[eId |
+  clock(16) class(v(0), veh) class(v(1), veh) class(i(0), infra) (atloc(v(0), loc(1320)) @ 16) (atloc(v(1), loc(1322)) @ 16) (speed(v(0), 20) @ 16) (speed(v(1), 23) @ 16) (accel(v(0), 0) @ 16) accel(v(1), 0) @ 16] 
+[v(0) : veh |
+  lkb : (clock(16) class(v(0), veh) (lastAct(actSpeed(v(0), 17, 23)) @ 15) (atloc(v(0), loc(1300)) @ 15) (atloc(v(1), loc(1276)) @ 14) (mode(v(0), leading(none)) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0), 20) @ 15) (speed(v(1), 23) @ 14) maxAcc(v(0), 3)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : ((tick @ 0) v2v(v(0), msg(v(1), v(0), hbf2l(v(1), 23, loc(1299))) @ 15) @ 0)] 
+[v(1) : veh |
+  lkb : (clock(16) class(v(1), veh) (lastAct(actSpeed(v(1), 20, 26)) @ 15) (atloc(v(0), loc(1048)) @ 15) (atloc(v(1), loc(1299)) @ 15) (mode(v(1), following(v(0))) @ 0) (platoon(v(0), v(1)) @ 0) (speed(v(0), 78) @ 15) (speed(v(1), 23) @ 15) (gapNext(v(1), 1) @ 15) (idNext(v(1), v(
+    0)) @ 0) (logSpdPlCkFail(v(1), v(0), 0) @ 0) (histSpd(v(1), v(0), (78 @ 15) ; (75 @ 14) ; 72 @ 13) @ 15) maxAcc(v(1), 3) gapGreen(v(1), 1, 3) gapSafety(v(1), 2, 4)),
+  ckb : none,
+  sensors : (locS speedS gapS),
+  evs : (tick @ 0)] 
+[i(0) : infra |
+  lkb : (clock(16) (atloc(v(0), loc(1300)) @ 15) atloc(v(1), loc(1299)) @ 15),
+  ckb : none,
+  sensors : vehS,
+  evs : (tick @ 0)]} ; 
+[iid : intruder |
+  v2vMsgsL : nil
+  blockActSnd : v(0)]}
+
+No more solutions.
+rewrites: 29234 in 48ms cpu (49ms real) (609041 rewrites/second)

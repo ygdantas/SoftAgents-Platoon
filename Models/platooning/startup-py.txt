@@ -1,0 +1,5 @@
+start maude iop_maude_wrapper basura load-meta-py
+start plambda pyactor plambda 
+# start g2d iop_java_wrapper $IOPBINDIR g2d.Main -Xms256m -Xmx1024m
+select maude
+

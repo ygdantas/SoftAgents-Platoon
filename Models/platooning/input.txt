@@ -1,0 +1,58 @@
+
+(pyexe plambda (apply print2err "hello"))
+(g2dexe g2d (apply print2err "hello"))
+
+(pyexe plambda (load "../../Lib/PyLsp/pyactorlib.lsp"))
+
+(pyexe (apply evalOK "maude" (apply console)))
+
+
+(show summary)
+
+**** use doRound to step n units
+(show val tval initASys)
+
+(doRound 1)
+(show val tval agentSys)
+
+**** to continue
+(doRoundAux 20)
+(show val tval agentSys)
+(show val tval envKB)
+
+**** step by hand, 
+(rewTilDone  doTask)
+(show val tval agentSys)
+(rewTilDone timeStep)
+(show val tval agentSys)
+
+(show val tval simActs)
+(show val tval maudeActs)
+(show val tval time)
+(show val tval nzt)
+(show val tval mte)
+
+*** what is going on
+(show control)
+(show requests)
+(show wait4s)
+(show log)
+(show summary)
+
+(reset control)
+(reset wait4s)
+
+**** restore maudes state
+(graphics2d OK)
+(plambda OK)
+
+(show note selections gval graph2)
+
+**** turn on IOP/g2d VERBOSITY
+(g2dexe graphics2d (supdate "g2d.util.ActorMsg" "VERBOSE" (boolean true)))
+(g2dexe graphics2d (supdate "g2d.Main" "DEBUG" (boolean true)))
+
+**** turn off IOP/g2d VERBOSITY
+(g2dexe graphics2d (supdate "g2d.util.ActorMsg" "VERBOSE" (boolean false)))
+(g2dexe graphics2d (supdate "g2d.Main" "DEBUG" (boolean false)))
+

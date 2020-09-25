@@ -1,0 +1,116 @@
+mod SCENARIO is
+  inc SOFT-AGENT-RULES .
+  inc MODEL-TASKS .
+  inc ENV-ACTIONS .
+  inc SENSOR-FAULTS .
+
+  vars ix t : Nat .
+  vars id : Id .
+  vars ids : IdSet .
+  vars l : Loc .
+  vars ff sp : Rat .
+  var mode : Mode .
+  vars xkb lkb kb ekb : KB .
+  var kekset : KBEventsKBSet . 
+
+  op v : Nat -> Id .
+  op eId : -> Id .
+  op i : Nat -> Id .
+
+eq toPrintKB(clock(t) ekb) =
+(if not (1 divides t)
+then none
+else getLocs(v(0) v(1) v(2), ekb,none)  fi) .
+op getLocs : IdSet KB KB -> KB .
+eq getLocs(id ids, (atloc(id,l) @ t) ekb,kb) =
+      getLocs(ids,  ekb,kb (atloc(id,l) @ t)) .
+eq getLocs(ids,ekb,kb) = kb [owise] .
+
+               
+
+*** Parameters
+eq selectKeK(lkb,kekset) = kekset [owise] .
+eq tickDelay = 1 .
+eq joinThresh = 50 .
+
+  ***        Id  time pos speed 
+op mkVeh : Nat Nat Rat Rat Mode KB -> Agent .
+op mkVehKb : Id Nat Rat Rat Mode  -> KB .
+
+eq mkVeh(ix,t,ff,sp,mode,xkb) = 
+  [v(ix) : veh | 
+   lkb : (mkVehKb(v(ix),t,ff,sp,mode) xkb),
+   ckb : none, 
+   sensors : (locS speedS gapS), 
+   evs : (tick @ 0)] . 
+
+eq mkVehKb(id,t,ff,sp,mode) = 
+  clock(t) class(id,veh) maxAcc(id,3) (mode(id,mode) @ t) (speed(id,sp) @ t) (atloc(id,loc(ff)) @ t) 
+   .
+ 
+ops infra veh0 veh1 veh2 : -> Agent .
+
+
+eq infra = 
+  [i(0) : infra | 
+   lkb : (clock(0)
+         (i2vTrigger(i(0),v(2),
+            500,50,nuPlatoon) @ 0)
+         (i2vTrigger(i(0),v(2),
+            600,50,join(v(0))) @ 0)),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+*** leader at 1k post
+eq veh0 = 
+  mkVeh(0,0,1000,20,leading(none),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(945)) @ 0)
+        (speed(v(1),20) @ 0)
+        ) .
+
+eq veh1 = 
+  mkVeh(1,0,945,20,following(v(0)),
+        (gapNext(v(1),55) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),2,3) 
+        gapSafety(v(1),2,4)
+        (histGap(v(1),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(1),v(0),noVal ; noVal ; noVal) @ 0)
+        (histSpd(v(1),v(2),noVal ; noVal ; noVal) @ 0)
+        (logSpdPlCkFail(v(1),v(0),0) @ 0)           
+        ) .
+
+ *** joiner at safe dist from leader
+ eq veh2 = 
+***   mkVeh(2,0,100,25,nonplatoon,none) 
+   mkVeh(2,0,400,25,nonplatoon,(gapGreen(v(1),2,3) gapSafety(v(1),2,4) )) 
+   .
+   
+   
+op ekbS1  : -> KB .
+eq ekbS1 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(1000)) @ 0)
+  (speed(v(0),20) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(945)) @ 0)
+  (speed(v(1),20) @ 0)
+  (accel(v(1),0) @ 0)
+  class(v(2),veh)
+  (atloc(v(2),loc(100)) @ 0)
+  (speed(v(2),25) @ 0)
+  (accel(v(2),0) @ 0)
+.
+
+op scenario1 : -> Conf .
+eq scenario1 = veh0 veh1 veh2 
+               infra [eId | ekbS1] .
+
+
+endm
+

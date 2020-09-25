@@ -1,0 +1,47 @@
+load load-sim
+
+load model-checker 
+load ../../../../imaude/ilib/load-lib
+load ../../Lib/meta-sa 
+load ../../Lib/meta-sa-stats 
+loop init .
+
+
+**** testing with just maude
+**** simname == unKnown => MaudePhysics
+**** maudename g2dname g2dvname simname amodname initname wid randinc 
+***(seq
+(loadg2dlib g2d ../../../../imaude/jlib/jl-util.lsp)
+(loadg2dlib g2d ../../Lib/stats-funs.lsp)
+(initAgentEset maude g2d g2d unKnown SCENARIO-STATS scenario-simple-ssf unKnown  600) 
+(initAgentEsetStats TwoCar 90 nGenericApprox .25 .25 3)
+)
+
+***(
+(initAgentEsetStats TwoCar 90 nGenericApprox .25 .25 3)
+
+**** scenario-simple-gsf
+averages ===> [ 60.0, 70.88235294117646, 66.93411764705881]
+count ===> 17
+
+**** scenario-simple-ssf
+averages ===> [ 57.705882352941174, 72.05882352941177, 66.23588235294118]
+count ===> 17
+)
+
+
+(seq
+ (pyexe plambda (load "../../Lib/PyLsp/pseudosim-py.lsp"))
+**** init veh/world
+(pyexe plambda (let ((v0 (apply initVeh "v(0)" (float 1000) (float 25))) (v1 (apply initVeh "v(1)" (float 945) (float 20))) ) (setUID v0 "v(0)") (setUID v1 "v(1)") (apply initWorld "w0" (mklist v0 v1) (float 4)) ))
+**** init stats
+(loadg2dlib g2d ../../../../imaude/jlib/jl-util.lsp)
+(loadg2dlib g2d ../../Lib/stats-funs.lsp)
+**** simname == unKnown => MaudePhysics
+**** maudename g2dname g2dvname simname amodname initname wid randinc 
+(initAgentEset maude g2d g2d plambda SCENARIO-STATS scenario-simple-gsf w0 600) 
+(initAgentEsetStats TwoCar 90 nGenericApprox .25 .25 3)
+)
+
+**** scenario-simple-ssf 
+**** scenario-simple-gsf

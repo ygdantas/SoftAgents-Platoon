@@ -1,0 +1,535 @@
+mod SCENARIO is
+  inc SOFT-AGENT-RULES .
+  inc MODEL-TASKS .
+  inc ENV-ACTIONS .
+  inc SENSOR-FAULTS .
+
+  vars ix t : Nat .
+  vars id : Id .
+  vars ids : IdSet .
+  vars l : Loc .
+  vars ff sp : Rat .
+  var mode : Mode .
+  vars xkb lkb kb ekb : KB .
+  var kekset : KBEventsKBSet . 
+
+  op v : Nat -> Id .
+  op eId : -> Id .
+  op i : Nat -> Id .
+
+eq toPrintKB(clock(t) ekb) =
+(if not (1 divides t)
+then none
+else getLocs(v(0) v(1) v(2), ekb,none)  fi) .
+op getLocs : IdSet KB KB -> KB .
+eq getLocs(id ids, (atloc(id,l) @ t) ekb,kb) =
+      getLocs(ids,  ekb,kb (atloc(id,l) @ t)) .
+eq getLocs(ids,ekb,kb) = kb [owise] .
+
+               
+
+*** Parameters
+eq selectKeK(lkb,kekset) = kekset [owise] .
+eq tickDelay = 1 .
+eq joinThresh = 150 .
+
+  ***        Id  time pos speed 
+op mkVeh : Nat Nat Rat Rat Mode KB -> Agent .
+op mkVehKb : Id Nat Rat Rat Mode  -> KB .
+
+eq mkVeh(ix,t,ff,sp,mode,xkb) = 
+  [v(ix) : veh | 
+   lkb : (mkVehKb(v(ix),t,ff,sp,mode) xkb),
+   ckb : none, 
+   sensors : (locS speedS gapS), 
+   evs : (tick @ 0)] . 
+
+eq mkVehKb(id,t,ff,sp,mode) = 
+  clock(t) class(id,veh) maxAcc(id,3) (mode(id,mode) @ t)
+   .
+ 
+ops infra-join veh0 v0 veh1 veh2 : -> Agent .
+
+
+eq infra-join = 
+  [i(0) : infra | 
+   lkb : (clock(0)
+         (i2vTrigger(i(0),v(2),
+            500,50,nuPlatoon) @ 0)
+         (i2vTrigger(i(0),v(2),
+            600,50,join(v(0))) @ 0)),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+*** leader at 1k post
+eq veh0 = 
+  mkVeh(0,0,1000,20,leading(none),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(945)) @ 0)
+        (speed(v(1),20) @ 0)
+        ) .
+
+eq v0 = 
+  mkVeh(0,0,1000,25,leading(none),
+        (platoon(v(0),v(1)) @ 0)
+        (atloc(v(1),loc(945)) @ 0)
+        (speed(v(0),25) @ 0)
+        (speed(v(1),20) @ 0)
+        ) .
+        
+*** follower at 945
+eq veh1 = 
+  mkVeh(1,0,945,20,following(v(0)),
+        (gapNext(v(1),55) @ 0)
+        (idNext(v(1),v(0)) @ 0)
+        gapGreen(v(1),2,3) 
+        gapSafety(v(1),2,4) 
+        (speed(v(1),20) @ 0)
+        ) .
+
+ *** joiner at safe dist from leader
+ eq veh2 = 
+   mkVeh(2,0,400,25,nonplatoon,
+         (gapGreen(v(2),2,3) gapSafety(v(2),2,4) )) 
+   .
+   
+   
+op ekbSS  : -> KB .
+eq ekbSS =
+  clock(0)
+  class(v(0),veh)
+  (atloc(v(0),loc(1000)) @ 0)
+  (speed(v(0),25) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(945)) @ 0)
+  (speed(v(1),20) @ 0)
+  (accel(v(1),0) @ 0)
+ .
+
+op ekbS1  : -> KB .
+eq ekbS1 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(1000)) @ 0)
+  (speed(v(0),20) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(945)) @ 0)
+  (speed(v(1),20) @ 0)
+  (accel(v(1),0) @ 0)
+  class(v(2),veh)
+  (atloc(v(2),loc(400)) @ 0)
+  (speed(v(2),25) @ 0)
+  (accel(v(2),0) @ 0)
+.
+
+op infra-emergency : -> Agent .
+eq infra-emergency = 
+  [i(0) : infra | 
+   lkb : (clock(0)
+         (i2vTrigger(i(0),v(0),
+         1100,50,i2vEmergency(v(0))) @ 0)),
+   ckb : none, 
+   sensors : vehS, 
+   evs : (tick @ 0)] .
+
+op ekbS2  : -> KB .
+eq ekbS2 =
+  clock(0)
+  class(i(0),infra)
+  class(v(0),veh)
+  (atloc(v(0),loc(1000)) @ 0)
+  (speed(v(0),25) @ 0)
+  (accel(v(0),0) @ 0)
+  class(v(1),veh)
+  (atloc(v(1),loc(945)) @ 0)
+  (speed(v(1),20) @ 0)
+  (accel(v(1),0) @ 0)
+.
+
+ op scenario-simple : -> ASystem .
+ eq scenario-simple = { v0 veh1  [eId | ekbSS] } .
+**** done clock = 10 or 20
+
+op scenario-join : -> ASystem .
+eq scenario-join = { veh0 veh1 veh2 
+                 infra-join [eId | ekbS1] } .
+
+**** get stuck
+
+ op scenario-emergency : -> ASystem .
+ eq scenario-emergency = 
+      { v0 veh1 infra-emergency [eId | ekbS2] } .
+
+**** both stopped at clock 14
+
+endm
+
+mod SCENARIO-SIM is
+  inc SCENARIO .
+
+var aconf : Conf .
+vars id eid : Id .
+var ekb : KB .
+var t t0 : Nat .
+vars evs sevs mevs : EventSet .
+var ev : Event .
+vars smin smax ff ff0 alon : Rat .
+var tmsg : TMsg .
+var rval : RVal .
+var b : Bool .
+
+***** This is a hack for now, speed2ack needs full conf
+op accelMax : -> Rat .
+eq accelMax = 3 .
+
+op isDone : ASystem -> Bool .
+eq isDone({aconf [eid | clock(t) ekb]}) = t >= 15 .
+
+op splitEvs : KB EventSet -> EventsPair .
+op splitEvs$ : KB EventSet EventSet EventSet -> EventsPair .
+eq splitEvs(ekb, evs) = splitEvs$(ekb, evs,none,none)  .
+eq splitEvs$(ekb,(actSpeed(id,smin,smax) @ t) evs,sevs,mevs) =
+    splitEvs$(ekb,evs,speed2acc(ekb,actSpeed(id,smin,smax) @ t ) sevs,mevs) .
+eq splitEvs$(ekb,({rval,  actSpeed(id,smin,smax)} @ t) evs,sevs,mevs) =
+    splitEvs$(ekb,evs,speed2acc(ekb,actSpeed(id,smin,smax) @ t ) sevs,mevs) .
+eq splitEvs$(ekb,(actSnd(id,tmsg) @ t) evs,sevs,mevs) =
+        splitEvs$(ekb,evs,sevs,(actSnd(id,tmsg) @ t) mevs) .
+eq splitEvs$(ekb, evs,sevs,mevs) = {sevs,mevs} [owise] .
+
+**** getMaxAcc : Id KB
+op speed2acc : KB Event -> Event .
+eq speed2acc(ekb (speed(id,ff) @ t0),actSpeed(id,smin,smax) @ t )
+ = mkActAcc(id,t,ff,smin,smax) .
+***(
+eq speed2acc(ekb (speed(id,ff) @ t0),{rval, actSpeed(id,smin,smax)} @ t )
+ = mkActAcc(id,t,ff,smin,smax) .
+)
+op mkActAcc : Id Nat Rat Rat Rat -> Event .
+ceq mkActAcc(id,t,ff,smin,smax) 
+ = actAcc(id,alon) @ t
+ if ff0 := (smin + smax) / 2
+ /\ alon := (if (ff <= ff0)
+             then min(accelMax, ff0 - ff)
+             else max(- accelMax, ff0 - ff)
+             fi) .
+
+eq speed2acc(ekb,ev) = ev [owise] .
+
+endm  
+
+mod SCENARIO-STATS is
+  inc SCENARIO-SIM .
+  inc RAT2FSTRING .
+
+vars kb kb0 ekb : KB .
+vars t n i j n1 : Nat .
+vars eid id : Id .
+var aconf : Conf .
+var asys : ASystem .
+vars pf vf fp0 fp1 fp2 fp3 dsp dsp0 gap  : Rat .
+vars rv rv0 rv1 rv2 gaps gmn gmx gmn1 gmx1 gav gav1 : Rat? .
+var gap? : [Rat] .
+var attrs : AttributeSet .
+var  b : Bool .
+var str : String .
+
+************* collecting statistics
+sort Rat? .
+subsort Rat < Rat? .
+op unkRat : -> Rat? .
+
+***(
+The effect of the fault models is defined by the function
+readSensor, which calls applySensorF  (in sensor-faults.maude)
+)***
+
+**** (sF(id,locS,simpleFT,sFP(fp0,fp1,ffV(fp2))) @ t1),
+**** id location sensor is broken w prob 1/20 
+****    and error fp2 w prob fp1
+op locsf : Id Rat Rat -> KB .
+eq locsf(id,fp1,fp2) =
+       (sF(id,locS,simpleFT,sFP(1/20,fp1,ffV(fp2))) @ 0) .
+
+**** gap sensor broken  with prob .05
+****      err fp2 with prob fp1
+****  sF(id,gapS,simpleFT,sFP(1/20,fp1,ffV(fp2))) @ t1),
+op gapsf :  Id Rat Rat  -> KB .
+eq gapsf(id,fp1,fp2) = (sF(id,gapS,simpleFT,sFP(1/20,fp1,ffV(fp2))) @ 0) .
+
+**** speed sensor broken  with prob .05
+****      err fp2 with prob fp1
+**** (sF(id,speedS,simpleFT,sFP(fp0,fp1,ffV(fp2))) @ t1),
+op speedsf :  Id Rat Rat  -> KB .
+eq speedsf(id,fp1,fp2) = 
+      (sF(id,speedS,simpleFT,sFP(1/20,fp1,ffV(fp2))) @ 0) .
+
+
+op upDateRand : ASystem Nat -> ASystem .
+op upDateRandKB  : Nat KB Nat KB -> KB .
+eq upDateRand({[ eid | clock(t)  ekb ] aconf}, n) =
+        {aconf [ eid | clock(t) upDateRandKB(t,ekb,n, none)] } .
+
+eq upDateRandKB(t, (rand(id,i,j) @ t) kb,n,kb0) = 
+    upDateRandKB(t, kb,n, (rand(id,i,j + n) @ t) kb0) .
+eq upDateRandKB(t,kb,n,kb0) = kb kb0 [owise] .
+
+
+****** some test scenarios with sensor faults
+
+var elt : ConfElt .
+
+op addEKb : ASystem KB -> ASystem .
+eq addEKb({aconf [eid | ekb]},kb) = {aconf [eid | addK(ekb,kb)]} .
+eq addEKb(asys,kb) = asys [owise] .
+
+op addConfElt : ASystem ConfElt -> ASystem .
+eq addConfElt({aconf},elt) = {aconf elt} .
+
+
+op stats : KB -> ConfElt .
+
+eq updateConf(aconf stats(kb)) 
+       = aconf stats(updateStats(aconf,kb)) .
+****                 stats stats
+op updateStats : Conf KB -> KB .
+
+
+**** Hack for testing -- two veh v1 following v0 straight road
+**** speed v1 v1loc gap gapnext
+op spGap : Rat? Rat? Rat? Rat? -> Info .
+
+ceq updateStats( [eid | clock(t) ekb] aconf, kb) = 
+       (kb spGap(rv0,rv1,gap,gaps) @ t) 
+if  rv0 := getSpeed(v(1),ekb)      
+/\  rv1 := getSpeed(v(1),getLkb(aconf,v(1)))
+/\  gap? := computeGap(v(1),ekb)      
+/\  gap := (if (gap? :: Rat) then gap? else unkRat fi)
+/\  gaps := getGapNext(v(1),aconf) .
+
+
+op getLkb : Conf Id -> KB .
+eq getLkb([id : veh | lkb : kb, attrs] aconf,id) = kb .
+eq getLkb(aconf,id) = none [owise] .
+
+op getSpeed : Id KB -> Rat? .
+eq getSpeed(id, (speed(id,rv) @ t) kb) = rv .
+eq getSpeed(id, kb) = unkRat [owise] .
+
+
+op getGapNext : Id Conf -> Rat .
+eq getGapNext(id, aconf
+                  [id : veh | (lkb : (kb (gapNext(id,rv) @ t))),
+                             attrs]) = rv .
+eq getGapNext(id, aconf) = unkRat [owise] .
+
+
+
+************ sample scenarios
+op randKB : -> KB .
+eq randKB = 
+ (randInc(3)
+  (rand(v(0),0,0) @ 0)  
+  (rand(v(1),1,0) @ 0) 
+  (rand(eId,2,0) @ 0)) .
+
+op randKBI : Nat -> KB .
+eq randKBI(n) = 
+ (randInc(3)
+  (rand(v(0),0,0) @ 0)  
+  (rand(v(1),1,n) @ 0) 
+  (rand(eId,2,0) @ 0)) .
+
+ops scenario-simple-gsf scenario-simple-lsf scenario-simple-ssf 
+       : -> ASystem .
+
+eq scenario-simple-gsf 
+      = addConfElt(addEKb(scenario-simple,
+                          gapsf(v(1),1/4,8) randKB), 
+                   stats(none)) .
+eq scenario-simple-ssf 
+      = addConfElt(addEKb(scenario-simple,
+                          speedsf(v(1),1/5,4) randKB) ,
+                   stats(none)) .
+
+eq scenario-simple-lsf =
+    addConfElt(addEKb(scenario-simple,
+                     locsf(v(1),1/5,10) randKB),
+               stats(none)) .
+
+
+****!!!!
+
+sort Rat?Triple .
+op `{_`,_`,_`} : Rat? Rat? Rat? ->  Rat?Triple .
+
+
+op getMnMxAvGap : KB -> Rat?Triple .
+op getMnMxAvGap$ : KB Nat Rat? Rat? Rat -> Rat?Triple .
+eq getMnMxAvGap(kb) = getMnMxAvGap$(kb,0,unkRat,unkRat,0) .
+eq getMnMxAvGap$((spGap(rv0,rv1,unkRat,gaps) @ t) kb,
+                  n,gmn,gmx,gav) 
+      = getMnMxAvGap$(kb,n, gmn,gmx,gav) .
+
+ceq getMnMxAvGap$((spGap(rv0,rv1,gap,gaps) @ t) kb,
+                    n,gmn,gmx,gav) 
+       = getMnMxAvGap$(kb,s n, gmn1,gmx1,gav1) 
+if gmn1 := (if gmn == unkRat 
+            then gap
+            else (if gap < gmn then gap else gmn fi)           
+             fi)
+/\ gmx1 := (if gmx == unkRat 
+            then gap
+            else  (if gap > gmx then gap else gmx fi) 
+            fi)
+/\ gav1 := (if (gav == unkRat) 
+            then gap
+            else gav + gap
+            fi)  .   
+
+eq getMnMxAvGap$(kb, n, gmn,gmx,gav) = 
+      {gmn,gmx,(if (n == 0) then 0 else gav / n fi)} [owise] .
+ 
+
+sort BoolRes .
+**** bool indicates multi or single
+**** res is string rep of answer 
+op br : Bool String -> BoolRes .
+op getObsX : ASystem  Bool -> BoolRes .
+op getObs : ASystem -> BoolRes .
+
+
+ceq getObsX({aconf stats(kb)},b) = br(b,str) 
+if {gmn,gmx,gav} := getMnMxAvGap(kb)
+/\ str := (if b
+           then 
+             "(double " + rat2fstr(gmn,2,6) + ")"  + " " + 
+             "(double " + rat2fstr(gmx,2,6) + ")"  + " " + 
+             "(double " + rat2fstr(gav,2,6) + ")"
+           else rat2fstr(gav, 2, 6) 
+           fi) .
+
+
+eq getObs(asys) = getObsX(asys,true) .
+
+
+endm
+
+mod SCENARIO-MSTATS is
+ inc SCENARIO-STATS .
+ inc META-LEVEL .
+ 
+var asys : ASystem .
+var aconf : Conf .
+var kb : KB .
+
+vars asysT asys1T : Term .
+var n : Nat .
+var res? : [ResultPair?] .
+
+**** run init n steps, apply log2devlist to final log
+op genStats : ASystem Nat -> KB .
+ceq genStats(asys,n) = kb
+if asysT := upTerm(asys)
+/\ res? := metaRewrite(['SCENARIO-STATS], asysT,n)
+/\ asys1T := (if res? :: ResultPair 
+              then getTerm(res?) 
+              else asysT fi)
+/\ {aconf stats(kb)} := downTerm(asys1T,{stats(none)})
+.
+
+op genObs : ASystem Nat -> BoolRes .
+ceq genObs(asys,n) =  getObs(downTerm(asys1T,{stats(none)}))
+if asysT := upTerm(asys)
+/\ res? := metaRewrite(['SCENARIO-STATS], asysT,n)
+/\ asys1T := (if res? :: ResultPair 
+              then getTerm(res?) 
+              else asysT fi)  .
+
+endm
+
+eof
+
+*****  min,max,average gap
+red getMnMxAvGap(genStats(addConfElt(addEKb(scenario-simple,gapsf(v(1),1/4,8) randKB),stats(none)), 57)) .
+**** {60,71,1244/19}
+
+red genObs(addConfElt(addEKb(scenario-simple,gapsf(v(1),1/4,8) randKB),stats(none)), 57) .
+**** br(true, "(double 60.00) (double 71.00) (double 65.47)")
+
+red getMnMxAvGap(genStats(addConfElt(addEKb(scenario-simple,gapsf(v(1),1/4,8) randKB),stats(none)), 90)) .
+**** {60,71,663/10}
+
+red getMnMxAvGap(genStats(addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKB), stats(none)), 90)) .
+**** {51,71,641/10}
+
+red genObs(addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKB),stats(none)), 57) .
+****  br(true, "(double 51.00) (double 71.00) (double 62.00)")
+
+red genObs(addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKB),stats(none)), 90) .
+****  br(true, "(double 51.00) (double 71.00) (double 64.10)")
+
+red genObs(addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKBI(600 * 10)),stats(none)), 90) .
+
+red genObs(addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKBI(600 * 11)),stats(none)), 90) .
+
+rew [1] addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKBI(600 * 11)),stats(none)) .
+
+
+
+rew [1] addConfElt(scenario-simple, stats(none)) .
+cont many times  stabilizes about 18
+(spGap(25, 20, 60, 55) @ 1) (spGap(25, 22, 65, 60) @ 2) (spGap(25,
+23, 68, 65) @ 3) (spGap(25, 24, 70, 68) @ 4) (spGap(25, 25, 60,
+60) @ 18) (spGap(25, 25, 60, 60) @ 19) (spGap(25, 25, 60, 60) @
+20) (spGap( 25, 25, 60, 60) @ 21) (spGap(25, 25, 60, 60) @ 22)
+(spGap(25, 25, 60, 60) @ 23) (spGap(25, 25, 60, 60) @ 24)
+(spGap(25, 25, 60, 60) @ 25) (spGap(25, 25, 60, 60) @ 26)
+(spGap(25, 25, 60, 60) @ 27) (spGap(25, 25, 60, 60) @ 28)
+(spGap(25, 25, 60, 60) @ 29) (spGap(25, 25, 60, 60) @ 30)
+(spGap(25, 25, 60, 60) @ 31) (spGap(25, 25, 60, 60) @ 32)
+(spGap(25, 25, 60, 60) @ 33) ( spGap(25, 25, 60, 60) @ 34)
+(spGap(25, 25, 60, 60) @ 35) (spGap(25, 25, 60, 60) @ 36)
+(spGap(25, 25, 60, 60) @ 37) (spGap(25, 25, 60, 60) @ 38) (spGap(
+25, 25, 60, 60) @ 39) (spGap(25, 25, 60, 60) @ 40) (spGap(25, 25,
+60, 60) @ 41) (spGap(25, 25, 60, 60) @ 42) (spGap(25, 25, 60, 60)
+@ 43) (spGap(25, 25, 60, 60) @ 44) (spGap(25, 25, 60, 60) @ 45)
+(spGap(25, 25, 60, 61) @ 17) (spGap(25, 25, 71, 70) @ 5)
+(spGap(25, 26, 61, 62) @ 16) (spGap(25, 26, 62, 63) @ 15)
+(spGap(25, 26, 63, 64) @ 14) (spGap(25, 26, 64, 65) @ 13) (spGap(
+25, 26, 65, 66) @ 12) (spGap(25, 26, 66, 67) @ 11) (spGap(25, 26,
+67, 68) @ 10) (spGap(25, 26, 68, 69) @ 9) (spGap(25, 26, 69, 70) @
+8) (spGap(25, 26, 70, 71) @ 7) (spGap(25, 26, 71, 71) @ 6)
+
+
+rew [1] scenario-simple-gsf .
+cont 56 .
+
+stats(
+(spGap(25, 20, 60, 55) @ 1) (spGap(25, 22, 65, 60) @ 2) (spGap(25, 23, 68, 65) @ 3) (spGap(25, 24, 70, 68) @ 4) (spGap(25, 25, 60, 60) @ 18) (spGap(25, 25, 60, 60) @ 19) (spGap(25, 25, 60, 61) @ 17) (spGap( 25, 25, 71, 70) @ 5) (spGap(25, 26, 61, 62) @ 16) (spGap(25, 26, 62, 63) @ 15) (spGap(25, 26, 63, 64) @ 14) (spGap(25, 26, 64, 65) @ 13) (spGap(25, 26, 65, 66) @ 12) (spGap(25, 26, 66, 71*) @ 11) (spGap(25, 26, 67, 72*) @ 10) (spGap(25, 26, 68, 69) @ 9) (spGap(25, 26, 69, 74*) @ 8) (spGap(25, 26, 70, 71) @ 7) (spGap(25, 26, 71, 71) @ 6)
+
+cont 90 .
+ {stats(
+(spGap(25, 20, 60, 55) @ 1) (spGap(25, 22, 65, 60) @ 2) (spGap(25, 23, 68, 65) @ 3) (spGap(25, 24, 60, 56) @ 33) (spGap(25, 24, 61, 60) @ 34) (spGap(25, 24, 62, 61) @ 35) (spGap(25, 24, 63, 62) @ 36) (spGap( 25, 24, 64, 63) @ 37) (spGap(25, 24, 65, 64) @ 38) (spGap(25, 24, 66, 61) @ 39) (spGap(25, 24, 67, 66) @ 40) (spGap(25, 24, 70, 68) @ 4) (spGap(25, 25, 60, 60) @ 18) (spGap(25, 25, 60, 60) @ 19) (spGap(25, 25, 60, 60) @ 20) ( spGap(25, 25, 60, 60) @ 21) (spGap(25, 25, 60, 60) @ 22) (spGap(25, 25, 60, 60) @ 23) (spGap(25, 25, 60, 60) @ 24) (spGap(25, 25, 60, 60) @ 25) (spGap(25, 25, 60, 60) @ 26) (spGap(25, 25, 60, 60) @ 27) (spGap(25, 25, 60, 60) @ 28) (spGap(25, 25, 60, 60) @ 29) (spGap(25, 25, 60, 60) @ 31) (spGap(25, 25, 60, 61) @ 17) (spGap(25, 25, 60, 64) @ 30) (spGap(25, 25, 60, 64) @ 32) (spGap(25, 25, 68, 67) @ 41) (spGap(25, 25, 68, 68) @ 42) (spGap(25, 25, 68, 68) @ 43) (spGap(25, 25, 68, 68) @ 44) (spGap(25, 25, 68, 68) @ 45) ( spGap(25, 25, 68, 68) @ 46) (spGap(25, 25, 68, 68) @ 47) (spGap(25, 25, 71, 70) @ 5) (spGap(25, 26, 61, 62) @ 16) (spGap(25, 26, 62, 63) @ 15) (spGap( 25, 26, 63, 64) @ 14) (spGap(25, 26, 64, 65) @ 13) (spGap(25, 26, 65, 66) @ 12) (spGap(25, 26, 66, 71) @ 11) (spGap(25, 26, 67, 68) @ 49) (spGap(25, 26, 67, 72) @ 10) (spGap(25, 26, 68, 69) @ 9) (spGap(25, 26, 68, 72) @ 48) (spGap(25, 26, 69, 74) @ 8) (spGap(25, 26, 70, 71) @ 7) (spGap(25, 26, 71, 71) @ 6)
+
+
+
+rew [1] addConfElt(addEKb(scenario-simple,gapsf(v(1),1/4,8) randKB),  stats(none)) .
+
+(spGap(25, 20, 60, 55) @ 1) (spGap(25, 22, 65, 60) @ 2) (spGap(25, 23, 68, 65) @ 3) (spGap(25, 24, 61, 54) @ 15) (spGap(25, 24, 62, 61) @ 16) (spGap(25, 24, 63, 62) @ 17) (spGap(25, 24, 64, 63) @ 18) (spGap(25, 24, 65, 64) @ 19) (spGap(25, 24, 70, 68) @ 4) (spGap(25, 25, 71, 70) @ 5) (spGap(25, 26, 62, 63) @ 14) (spGap(25, 26, 63, 64) @ 13) (spGap(25, 26, 64, 73) @ 12) (spGap(25, 26, 65, 66) @ 11) (spGap(25, 26, 66, 67) @ 10) (spGap(25, 26, 67, 68) @ 9) (spGap(25, 26, 68, 69) @ 8) (spGap(25, 26, 69, 63) @ 7) (spGap(25, 27, 71, 79) @ 6)
+
+cont 90 .
+(spGap(25, 20, 60, 55) @ 1) (spGap(25, 22, 65, 60) @ 2) (spGap(25, 23, 60, 52) @ 43) (spGap(25, 23, 62, 60) @ 44) (spGap(25, 23, 64, 62) @ 45) (spGap(25, 23, 68, 65) @ 3) (spGap(25, 24, 61, 54) @ 15) (spGap(25, 24, 62, 61) @ 16) (spGap(25, 24, 63, 62) @ 17) (spGap(25, 24, 64, 63) @ 18) (spGap(25, 24, 65, 64) @ 19) (spGap(25, 24, 66, 64) @ 46) (spGap(25, 24, 66, 65) @ 20) (spGap(25, 24, 67, 65) @ 21) (spGap(25, 24, 67, 66) @ 47) (spGap(25, 24, 70, 68) @ 4) (spGap(25, 25, 60, 61) @ 42) (spGap(25, 25, 68, 67) @ 22) (spGap(25, 25, 68, 67) @ 48) (spGap(25, 25, 68, 68) @ 23)  (spGap(25, 25, 68, 68) @ 24) (spGap(25, 25, 68, 68) @ 25) (spGap(25, 25, 68, 68) @ 26) (spGap(25, 25, 68, 68) @ 27) (spGap(25, 25, 68, 68) @ 28) (spGap(25, 25, 68, 68) @ 29) (spGap(25, 25, 68, 68) @ 30) (spGap(25, 25, 68, 68) @ 31) (spGap(25, 25, 68, 68) @ 32) (spGap(25, 25, 68, 68) @ 33) (spGap(25, 25, 68, 68) @ 49) (spGap(25, 25, 71, 70) @ 5) (spGap(25, 26, 61, 62) @ 41) (spGap(25, 26, 62, 63) @ 14) (spGap(25, 26, 62, 71) @ 40) (spGap(25, 26, 63, 64) @ 13) (spGap(25, 26, 63, 64) @ 39) (spGap(25, 26, 64, 65) @ 38)  (spGap(25, 26, 64, 73) @ 12) (spGap(25, 26, 65, 66) @ 11) (spGap(25, 26, 65, 74) @ 37) (spGap(25, 26, 66, 67) @ 10) (spGap(25, 26, 66, 67) @ 36) (spGap(25, 26, 67, 68) @ 9) (spGap(25, 26, 67, 68) @ 35) (spGap(25, 26, 68, 69) @ 8) (spGap(25, 26, 68, 76) @ 34) (spGap(25, 26, 69, 63) @ 7) (spGap(25, 27, 71, 79) @ 6)
+
+
+eq scenario-simple-ssf 
+      = addConfElt(addEKb(scenario-simple,speedsf(v(1),1/5,4) randKB), stats(none)) .
+
+rew [1] scenario-simple-ssf .
+cont 56 .
+    
+(spGap(20, 20, 60, 55) @ 1) (spGap(22, 20, 65, 60) @ 2) (spGap(22, 22, 56, 53) @ 16) (spGap(22, 22, 59, 56) @ 17) (spGap(22, 23, 53, 51) @ 15) (spGap(23, 22, 62, 59) @ 18) (spGap(23, 22, 68, 65) @ 3) ( spGap(23, 23, 64, 62) @ 19) (spGap(23, 25, 51, 51) @ 14) (spGap(24, 23, 70, 68) @ 4) (spGap(25, 24, 71, 70) @ 5) (spGap(25, 27, 51, 53) @ 13) (spGap( 26, 25, 71, 71) @ 6) (spGap(26, 26, 70, 71) @ 7) (spGap(27, 30, 53, 58) @ 12) (spGap(28, 29, 65, 69) @ 9) (spGap(29, 30, 69, 70) @ 8) (spGap(29, 32, 62, 65) @ 10) (spGap(30, 33, 58, 62) @ 11)    
+    
