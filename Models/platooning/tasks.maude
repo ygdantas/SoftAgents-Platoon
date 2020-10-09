@@ -46,13 +46,14 @@ fmod MODEL-TASKS is
   --- op doTasks : Class Id TaskSet EventSet EventSet KB KB -> KBEventsKBSet . 
 
   ceq doTasks(cl,id,tsks,ievs,devs,skb,lkb)
-   = doTasks$(cl,id,tsks1,devs,lkb3,none,none)
+   = doTasks$(cl,id,tsks1,devs,lkb4,none,none)
    if lkb0 := handleS(cl,id,lkb,ievs)
    /\ lkb1 := proSensors(id,lkb0,skb)
- *** /\ lkb2 := spdErrThld(id,lkb1, (30/100))
+   /\ lkb2 := spdErrThld(id,lkb1, (30/100))
+   /\ lkb3 := gapErrThld(id,lkb2, (30/100))
    *** Update history of plausibility checks.
    *** In fact, on the gap history is updated.
-   /\ lkb3 := upHist(id,lkb1)
+   /\ lkb4 := upHist(id,lkb3)
    /\ tsks1 := validTasks(id,lkb,tsks,none) .
 
 op validTasks : Id KB TaskSet TaskSet -> TaskSet .

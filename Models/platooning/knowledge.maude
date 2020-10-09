@@ -11,7 +11,7 @@ fmod MODEL-KNOWLEDGE is
 	var cl : Class .
   vars l l0 l1 l2 l3 loc : Loc .
   vars ekb ekb0 ekb1 kb  lkb kb1 lkb0 kb0 kb2 :  KB .
-  vars  ff ff0 ff1 fp0 fp1 rp0 rp1 ff2 ff3 spd spd1 devSpd thldSpd spdNext spdVehNext spdIdNext r sum sum1 avg avgL lenL acc : Rat .
+  vars  ff ff0 ff1 fp0 fp1 rp0 rp1 ff2 ff3 spd spd1 devSpd thldSpd spdNext spdVehNext spdIdNext r sum sum1 avg avgL lenL acc lValue gap2 gap1 spdNxtAvg spdCurVeh : Rat .
 	vars act act0 act1 : Action .
   vars md md1 : Mode .
   vars ids ids0 : IdSet .
@@ -234,9 +234,23 @@ if  (logSpdPlCkFail(id, idNxt, inc) @ t3) kb1 := getLKB(agent)
 /\  (inc > 0) .
 
 ***if  (platoon(idL, id1 ; id2) @ t3) kb1 := getLKB(agent) .
-  
 
+op avgSpeedBasedOnGapSensor : TimedRat TimedRat Rat -> Rat .  
+eq avgSpeedBasedOnGapSensor( (gap2 @ t2), (gap1 @ t1), spdCurVeh) 
+= ( spdCurVeh + ( (gap2) - (gap1) ) ) .
 
+*** Plausibility check: sensor gap
+op gapErrThld : Id KB Rat -> KB . 
+ceq gapErrThld(id, kb, thldSpd) 
+= if ( (spdIdNext > (spdNxtAvg + (spdNxtAvg * thldSpd))) and ((trat0 =/= noVal) and (trat1 =/= noVal))) or ((spdIdNext < (spdNxtAvg - spdNxtAvg * thldSpd)) and ((trat0 =/= noVal) and (trat1 =/= noVal)))  then
+ clock(t1) (speed(id, spdCurVeh) @ t2) (logSpdPlCkFail(id, idNxt, (inc + 1) ) @ t1) (histGap(id, trat0 ; trat1 ; trats) @ t4)  (speed(idNxt, spdIdNext) @ t5) kb1
+ else
+   kb
+ fi  
+ if clock(t1) (speed(id, spdCurVeh) @ t2) (logSpdPlCkFail(id, idNxt, inc) @ t3) (histGap(id, trat0 ; trat1 ; trats) @ t4)  (speed(idNxt, spdIdNext) @ t5) kb1 := kb 
+ /\ spdNxtAvg := avgSpeedBasedOnGapSensor(trat0, trat1, spdCurVeh) .
+
+ eq gapErrThld(id, kb, thldSpd) = kb [owise] .
 
 *** Plausibility check: Speed Error Threshold
 **** A vehicle checks whether a speed value exceeds a certain threshold (in %); A log entry is created whenever the speed value exceeds the thread

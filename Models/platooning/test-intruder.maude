@@ -12,15 +12,16 @@ mod TEST-INTRUDER is
  var conf : Conf .
  var attrs : AttributeSet .
  vars kb kb0 : KB .
- vars t0 t1 t2 : Nat .
+ vars t0 t1 t2 cnt : Nat .
  vars ff ff0 ff1 ffL ffH : Rat .
  var int : Intruder .
- var asys : ASystem .
+ vars asys scario : ASystem .
  var iasys : ASystemIntruder .
- var agent : Agent .
+ vars agent agent1 agent2 agent3 : Agent . 
  var cl : Class .
  var id0 : Id .
  var env : Env .
+ var evs : EventSet . 
 
  op imsgs : -> Msgs .
 
@@ -35,7 +36,7 @@ mod TEST-INTRUDER is
  eq intruder(ff,n) 
    = [iid : intruder |
       (v2vMsgs : genMsgs(ff,n,none))
-      (blockActSndSet : { v(0) ; false ; 0} )
+      (blockActSndSet : { v(0) ; true ; 0} )
       ] .
 
  op asysint : Rat Nat -> ASystemIntruder .
@@ -86,9 +87,34 @@ mod TEST-INTRUDER is
 
  op asys2 : -> ASystemIntruder .
 
+op getAgtFromConf : ASystemIntruder -> Agent .
+eq getAgtFromConf({ { agent1 agent2 conf env } ; int }) = agent2 .
+
+op noLogs : ASystemIntruder -> Bool .
+op noLogs$ : Agent -> Bool .
+ 
+ceq noLogs({ scario ; int})
+ = true 
+ if noLogs$(getAgtFromConf({ scario ; int})) .
+
+ceq noLogs$( [v(1) : cl | 
+            lkb : kb0,
+            ckb : none,
+            sensors : (locS speedS gapS), 
+            evs : evs ] 
+             )
+= if ( (cnt == 0) )  then
+    true
+  else
+    false
+  fi 
+if (logSpdPlCkFail(v(1), v(0), cnt) @ t1) kb := kb0 .
 endm
 
 eof
+
+search [1] in TEST-INTRUDER : asysint(70, 1) =>* iasys such that crash(iasys) and noLogs(iasys) .
+
 
 *** *** new load; without plausibility check enabled ***
 search [1] in TEST-INTRUDER : asysint(70, 1) =>* iasys such that crash(iasys) = true .

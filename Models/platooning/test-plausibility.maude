@@ -484,6 +484,7 @@ eq v1 = mkVeh(1,0,pos1,vel1,following(v(0)),
 ***        (histSpd(v(0),v(1), noVal ; (20/1 @ 0) ; (20/1 @ 0)) @ 0) 
 ***        (histSpd(v(1),v(0),20 ; 20 ; 20) @ 0)        
         (histSpd(v(1),v(0),noVal ; noVal ; (20 @ 0)) @ 0)
+        (histGap(v(1),noVal ; noVal ; noVal) @ 0)
         ) .
 
 ops infra2 v2 : -> Agent .
